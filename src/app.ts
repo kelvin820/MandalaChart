@@ -1,3 +1,4 @@
+import { svgChart } from "./export.ts";
 import {
   chartSchema,
   contextSchema,
@@ -114,7 +115,7 @@ function renderHome() {
     )
     .join(
       "",
-    )}</div><button data-action="demo" class="full-width" ${loadError ? "disabled" : ""}>先試用一張已填範例 ↗</button><div class="side-quote">「有方向的微小行動，<br>也值得被看見。」<span>BUILD YOUR OWN POSSIBILITY.</span></div></aside></div><section class="list-section"><div class="list-head"><h2>我的曼陀羅表 <span class="step">${String(charts.length).padStart(2, "0")}</span></h2><div class="inline-buttons"><button class="quiet" data-action="demo" ${loadError ? "disabled" : ""}>試用範例</button><button class="quiet" data-action="import">匯入備份</button><button class="quiet" data-action="backup">備份全部 ↓</button></div></div>${
+    )}</div><button data-action="demo" class="full-width" ${loadError ? "disabled" : ""}>先試用一張已填範例 ↗</button><div class="side-quote">「有方向的微小行動，<br>也值得被看見。」<span>BUILD YOUR OWN POSSIBILITY.</span></div></aside></div><section class="list-section"><div class="list-head"><h2>我的曼陀羅表 <span class="step">${String(charts.length).padStart(2, "0")}</span></h2><div class="inline-buttons"><button class="quiet" data-action="demo" ${loadError ? "disabled" : ""}>試用範例</button><button class="quiet" data-action="import">匯入備份</button><a class="quiet button-link" href="/api/backup.json" target="_blank" rel="noopener">備份全部 ↓</a></div></div>${
     charts.length
       ? `<div class="saved-list">${charts
           .slice()
@@ -595,77 +596,66 @@ function showEdit(kind: "meta" | "pillar" | "atom") {
     }
   };
 }
-function svgChart(c: Chart) {
-  const cell = 108,
-    margin = 32;
-  const cells: Array<Array<{ text: string; color: string; center?: boolean }>> =
-    Array.from({ length: 9 }, () =>
-      Array.from({ length: 9 }, () => ({ text: "尚未展開", color: "#e5e5eb" })),
-    );
-  const coordinates = POS.map((p, j) => ({
-    p,
-    x: j % 3,
-    y: Math.floor(j / 3),
-  })).filter((q) => q.p !== -1);
-  cells[4][4] = { text: c.goal, color: "#243963", center: true };
-  for (const q of coordinates) {
-    cells[3 + q.y][3 + q.x] = {
-      text: c.subGoals[q.p].title,
-      color: "#677ba7",
-      center: true,
-    };
-    cells[q.y * 3 + 1][q.x * 3 + 1] = {
-      text: c.subGoals[q.p].title,
-      color: "#677ba7",
-      center: true,
-    };
-    for (const a of coordinates) {
-      const atom = c.expansions[q.p]?.[a.p];
-      cells[q.y * 3 + a.y][q.x * 3 + a.x] = {
-        text: atom?.title ?? "尚未展開",
-        color: atom ? "#fffefa" : "#efedf1",
-      };
-    }
-  }
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1036" height="1130" viewBox="0 0 1036 1130"><rect width="1036" height="1130" fill="#faf7f2"/><text x="32" y="43" font-family="Arial,sans-serif" font-size="24" fill="#243963">我的曼陀羅表</text><text x="32" y="73" font-family="Arial,sans-serif" font-size="12" fill="#858596">MANDALA STUDIO · 一個目標，八個支柱，六十四個開始的可能。</text>`;
-  for (let y = 0; y < 9; y++)
-    for (let x = 0; x < 9; x++) {
-      const d = cells[y][x],
-        px = margin + x * cell,
-        py = 100 + y * cell;
-      svg += `<rect x="${px + 2}" y="${py + 2}" width="104" height="104" rx="5" fill="${d.color}" stroke="#dad9e1" stroke-width=".5"/>`;
-      const chars = Array.from(d.text),
-        lines: string[] = [];
-      const fontSize = Math.max(
-        5,
-        Math.min(11, Math.floor(Math.sqrt(6750 / Math.max(chars.length, 1)))),
-      );
-      const perLine = Math.floor(88 / fontSize),
-        lineHeight = fontSize * 1.2;
-      while (chars.length) lines.push(chars.splice(0, perLine).join(""));
-      lines.forEach((s, j) => {
-        svg += `<text x="${px + 54}" y="${py + 54 - ((lines.length - 1) * lineHeight) / 2 + j * lineHeight}" text-anchor="middle" font-family="Arial,sans-serif" font-size="${fontSize}" fill="${d.center ? "#ffffff" : "#505873"}">${escape(s)}</text>`;
-      });
-    }
-  return (
-    svg +
-    '<text x="32" y="1104" font-family="Arial,sans-serif" font-size="11" fill="#858596">先建立方向，再走出自己的路。</text></svg>'
-  );
+function downloadLink(url: string, label: string, primary = false) {
+  return `<a class="button-link ${primary ? "primary" : ""}" href="${escape(url)}" target="_blank" rel="noopener">${label}</a>`;
 }
-function download(body: string, type: string, name: string) {
-  const url = URL.createObjectURL(new Blob([body], { type })),
-    a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function exportUrl(format: string, c: Chart = current!) {
+  return `/api/charts/${c.id}/export.${format}${format === "pdf" ? "?revision=" + c.revision : ""}`;
+}
+async function preparePdf(button: HTMLElement) {
+  const snapshot = structuredClone(current!);
+  button.setAttribute("disabled", "");
+  button.textContent = "正在產生 PDF…";
+  const result = $("#pdfResult");
+  result.textContent = "正在保留中文字型與排版，請稍候…";
+  try {
+    await document.fonts.ready;
+    const image = new Image();
+    image.src =
+      "data:image/svg+xml;charset=utf-8," +
+      encodeURIComponent(svgChart(snapshot));
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = 2072;
+    canvas.height = 2260;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw Error("瀏覽器無法產生圖片，請改用 SVG 下載。");
+    ctx.fillStyle = "#faf7f2";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const png = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (blob) =>
+          blob ? resolve(blob) : reject(Error("無法產生 PDF 圖片，請重試。")),
+        "image/png",
+      ),
+    );
+    if (png.size > 3_000_000) throw Error("PDF 圖片過大，請改用 SVG 下載。");
+    const response = await fetch(exportUrl("pdf", snapshot), {
+      method: "POST",
+      headers: { "Content-Type": "image/png" },
+      body: png,
+      signal: AbortSignal.timeout(60000),
+    });
+    const body = await response.json();
+    if (!response.ok) throw Error(body.error || "產生 PDF 失敗，請稍後重試。");
+    result.innerHTML =
+      downloadLink(body.url, "下載 PDF ↓", true) +
+      '<p class="note">PDF 已產生。點擊上方連結下載；JSON 備份可用來還原編輯。</p>';
+    button.textContent = "重新產生 PDF";
+  } catch (e) {
+    result.textContent = (e as Error).message || "PDF 產生失敗，請重試。";
+    button.textContent = "重試產生 PDF";
+  } finally {
+    button.removeAttribute("disabled");
+  }
 }
 function openExport() {
   show(
     modal(
       "讓你的計畫，看得見",
-      `<p>已填寫的內容會保留；未展開的格子會標示，不會自動補上行動。</p><div class="export-preview">${svgChart(current!)}</div>`,
-      `<button data-action="downloadChartJson">備份這張表 JSON</button><button data-action="printChart">列印 / PDF</button><button class="primary" data-action="downloadSvg">下載 SVG ↓</button>`,
+      `<p>PDF 與 SVG 供閱讀、分享；JSON 備份可匯入並繼續編輯。未展開的格子會保留標示。</p><div class="export-preview">${svgChart(current!)}</div><div id="pdfResult" class="download-result" role="status" aria-live="polite"></div>`,
+      `${downloadLink(exportUrl("json"), "下載 JSON 備份 ↓")}<button data-action="preparePdf" class="primary">產生 PDF</button>${downloadLink(exportUrl("svg"), "下載 SVG ↓")}`,
     ),
   );
 }
@@ -976,31 +966,16 @@ async function act(action: string, button: HTMLElement) {
     openWorlds();
     return;
   }
-  if (action === "downloadSvg") {
-    download(
-      svgChart(current!),
-      "image/svg+xml;charset=utf-8",
-      "我的曼陀羅表.svg",
-    );
+  if (action === "preparePdf") {
+    await preparePdf(button);
     return;
   }
-  if (action === "printChart") {
-    window.print();
-    return;
-  }
-  if (action === "downloadChartJson") {
-    download(
-      JSON.stringify({ version: 2, charts: [current] }, null, 2),
-      "application/json",
-      "曼陀羅表備份.json",
-    );
-    return;
-  }
-  if (action === "backup") {
-    download(
-      JSON.stringify({ version: 2, charts }, null, 2),
-      "application/json",
-      "全部曼陀羅表備份.json",
+  if (action === "downloadChartJson" || action === "backup") {
+    show(
+      modal(
+        "下載可還原的備份",
+        `<p>下載 JSON 後，可透過首頁的「匯入備份」繼續編輯。</p>${downloadLink(action === "backup" ? "/api/backup.json" : exportUrl("json"), "下載 JSON 備份 ↓", true)}`,
+      ),
     );
     return;
   }

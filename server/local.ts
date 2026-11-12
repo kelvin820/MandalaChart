@@ -1,3 +1,4 @@
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, mkdirSync } from "node:fs";
@@ -50,7 +51,7 @@ const server = createServer(async (req, res) => {
     let size = 0;
     for await (const chunk of req) {
       size += chunk.length;
-      if (size > 300_000) {
+      if (size > (req.url?.includes("/export.pdf") ? 3_000_000 : 300_000)) {
         res.writeHead(413);
         res.end("Body too large");
         return;
@@ -66,7 +67,22 @@ const server = createServer(async (req, res) => {
         : {}),
     });
     const response = new URL(url).pathname.startsWith("/api/")
-      ? await api(request, process.env, store, "local-owner")
+      ? await api(request, process.env, store, "local-owner", undefined, {
+          async get(key: string) {
+            try {
+              return new Uint8Array(
+                await readFile(resolve("work/exports", key)),
+              );
+            } catch {
+              return null;
+            }
+          },
+          async put(key: string, bytes: Uint8Array) {
+            const target = resolve("work/exports", key);
+            await mkdir(resolve(target, ".."), { recursive: true });
+            await writeFile(target, bytes);
+          },
+        })
       : await worker.fetch(request, {});
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));

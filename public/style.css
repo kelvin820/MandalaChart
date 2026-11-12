@@ -1269,3 +1269,59 @@ dialog::backdrop {
     max-height: 92vh;
   }
 }
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  font: inherit;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.button-link:hover {
+  background: var(--blue-soft);
+}
+.button-link.primary {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+.button-link.quiet {
+  font-size: 11px;
+  background: transparent;
+  border: 0;
+}
+.button-link:focus-visible {
+  outline: 3px solid #8e9fc9;
+  outline-offset: 3px;
+}
+.download-result:empty {
+  display: none;
+}
+.download-result {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 12px;
+  margin: 18px 0;
+  background: var(--blue-soft);
+}
+.download-result p {
+  margin: 10px 0 0;
+}
+@media (max-width: 760px) {
+  .modal-footer .button-link {
+    flex: 1;
+    font-size: 11px;
+  }
+  .button-link.quiet {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+}

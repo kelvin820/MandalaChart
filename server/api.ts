@@ -1,3 +1,4 @@
+import { attachment, chartFile, type FileStore } from "./files.ts";
 import { z } from "zod";
 import {
   chartSchema,
@@ -42,6 +43,7 @@ export async function api(
     g: Generation,
     e: ModelEnv,
   ) => Promise<unknown> = completeStructured,
+  files?: FileStore,
 ) {
   const url = new URL(request.url),
     path = url.pathname;
@@ -50,6 +52,27 @@ export async function api(
   if (request.method !== "GET" && origin && origin !== url.origin)
     return json({ error: "不允許跨來源操作。" }, 403);
   try {
+    if (path === "/api/backup.json" && request.method === "GET") {
+      return attachment(
+        JSON.stringify(
+          { version: 2, charts: await store.list(owner) },
+          null,
+          2,
+        ),
+        "application/json; charset=utf-8",
+        "全部曼陀羅表備份.json",
+      );
+    }
+    const exportMatch = path.match(
+      /^\/api\/charts\/([a-f0-9-]+)\/export\.(json|svg|pdf)$/,
+    );
+    if (exportMatch) {
+      const id = z.string().uuid().parse(exportMatch[1]);
+      const c = await store.get(owner, id);
+      if (!c) return json({ error: "找不到這張表。" }, 404);
+      const result = await chartFile(request, c, exportMatch[2], owner, files);
+      return result ?? json({ error: "不支援這個匯出操作。" }, 405);
+    }
     if (path === "/api/config")
       return json({
         modelReady: !!(env.OPENAI_API_KEY && env.OPENAI_MODEL),

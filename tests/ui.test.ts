@@ -30,7 +30,11 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
         body = { chart: saved };
       }
     } else if (path === "/api/charts") body = { charts };
-    else if (path.startsWith("/api/charts/"))
+    else if (path.includes("/export.pdf") && init.method === "POST") {
+      assert.equal(init.headers["Content-Type"], "image/png");
+      assert.ok(init.body.size > 0);
+      body = { url: path };
+    } else if (path.startsWith("/api/charts/"))
       body = { chart: charts.find((c) => c.id === path.split("/").pop()) };
     else throw Error("Unexpected fetch " + path);
     return new Response(JSON.stringify(body), {
@@ -58,6 +62,20 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
       "",
     ),
   );
+  Object.defineProperty(w.document, "fonts", {
+    value: { ready: Promise.resolve() },
+  });
+  (w as any).Image = class {
+    src = "";
+    async decode() {}
+  };
+  w.HTMLCanvasElement.prototype.getContext = (() => ({
+    fillStyle: "",
+    fillRect() {},
+    drawImage() {},
+  })) as any;
+  w.HTMLCanvasElement.prototype.toBlob = ((callback: any) =>
+    callback(new w.Blob(["rendered-png"], { type: "image/png" }))) as any;
   w.eval(readFileSync("dist/client/app.js", "utf8"));
   await pause();
   const q = (s: string) => {
@@ -134,6 +152,13 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
     82,
   );
   assert.match(q(".export-preview").textContent, /尚未展開/);
+  assert.equal(q('a[href$="/export.json"]').target, "_blank");
+  assert.equal(q('a[href$="/export.svg"]').target, "_blank");
+  await click("preparePdf");
+  const pdfLink = q("#pdfResult a");
+  assert.match(pdfLink.href, /export\.pdf\?revision=/);
+  assert.equal(pdfLink.target, "_blank");
+  assert.equal(pdfLink.textContent, "下載 PDF ↓");
   await click("close");
   await click("home");
   assert.equal(w.document.querySelectorAll(".saved-card").length, 1);

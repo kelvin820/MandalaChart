@@ -1,9 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DatabaseSync } from "node:sqlite";
-import { readFileSync } from "node:fs";
 import { api } from "../server/api.ts";
-import { D1Store } from "../server/store.ts";
+import { fixture } from "./support.ts";
 import { demoChart } from "../src/demo.ts";
 import {
   applyCandidate,
@@ -12,33 +10,6 @@ import {
   atomsOutput,
   chartSchema,
 } from "../src/domain.ts";
-function fixture() {
-  const sqlite = new DatabaseSync(":memory:");
-  sqlite.exec(readFileSync("drizzle/0000_mandala.sql", "utf8"));
-  const db = {
-    prepare(sql: string) {
-      let values: any[] = [];
-      const stmt = {
-        bind(...args: any[]) {
-          values = args;
-          return stmt;
-        },
-        async all() {
-          return { results: sqlite.prepare(sql).all(...values) };
-        },
-        async first() {
-          return sqlite.prepare(sql).get(...values) ?? null;
-        },
-        async run() {
-          const r = sqlite.prepare(sql).run(...values);
-          return { meta: { changes: Number(r.changes) } };
-        },
-      };
-      return stmt;
-    },
-  } as unknown as D1Database;
-  return new D1Store(db);
-}
 function req(path: string, method = "GET", body?: unknown, origin?: string) {
   return new Request("https://test.example" + path, {
     method,

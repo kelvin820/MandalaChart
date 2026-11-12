@@ -3,7 +3,10 @@ import { D1Store } from "./store.ts";
 import type { ModelEnv } from "./llm.ts";
 import assets from "./assets.generated.ts";
 export default {
-  async fetch(request: Request, env: ModelEnv & { DB?: D1Database }) {
+  async fetch(
+    request: Request,
+    env: ModelEnv & { DB?: D1Database; BUCKET?: R2Bucket },
+  ) {
     const path = new URL(request.url).pathname;
     if (path.startsWith("/api/")) {
       if (!env.DB) return json({ error: "雲端資料庫尚未完成設定。" }, 503);
@@ -12,6 +15,20 @@ export default {
         env,
         new D1Store(env.DB),
         request.headers.get("oai-authenticated-user-id"),
+        undefined,
+        env.BUCKET
+          ? {
+              async get(key: string) {
+                const file = await env.BUCKET!.get(key);
+                return file ? new Uint8Array(await file.arrayBuffer()) : null;
+              },
+              async put(key: string, bytes: Uint8Array) {
+                await env.BUCKET!.put(key, bytes, {
+                  httpMetadata: { contentType: "application/pdf" },
+                });
+              },
+            }
+          : undefined,
       );
     }
     const file =
