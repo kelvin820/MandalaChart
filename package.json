@@ -1,0 +1,27 @@
+{
+  "name": "mandala-goal-studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "start": "node --env-file-if-exists=.env dist/local.mjs",
+    "db:generate": "drizzle-kit generate --name mandala"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "latest",
+    "ai": "latest",
+    "drizzle-orm": "^0.45.4",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@types/node": "latest",
+    "drizzle-kit": "^0.31.11",
+    "esbuild": "latest",
+    "happy-dom": "^21.0.4",
+    "prettier": "^3.10.1",
+    "typescript": "latest"
+  }
+}
