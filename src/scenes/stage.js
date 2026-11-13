@@ -64,6 +64,7 @@ function atmosphere(scene) {
 function disposeObjects(group) {
   const resources = new Set();
   group.traverse((object) => {
+    if (object.isInstancedMesh) object.dispose();
     if (object.geometry) resources.add(object.geometry);
     if (object.material) resources.add(object.material);
   });

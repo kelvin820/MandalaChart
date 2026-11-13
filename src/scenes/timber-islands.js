@@ -105,8 +105,11 @@ function log(parent, point, color, size = 1) {
   return piece;
 }
 
-function tree(parent, point, kind, scale) {
-  const [leaf, bark, form] = grove[kind];
+function tree(parent, point, kind, scale, variation = 2) {
+  const [baseLeaf, bark, form] = grove[kind];
+  const leaf = new T.Color(baseLeaf)
+    .multiplyScalar(0.78 + (variation % 5) * 0.115)
+    .getHex();
   const group = new T.Group();
   group.position.copy(point);
   group.scale.setScalar(scale);
@@ -150,65 +153,218 @@ const shorePalettes = [
   [0x99abb6, 0x4d697e, 0xe3ad55],
 ];
 
-function pavedSurface(parent, points, color, index) {
-  const [stone, , accent] = shorePalettes[index];
-  const industrial = !woods[index];
-  const tiles = [];
-  const pitch = 0.23;
-  const inside = (x, z) => {
-    let result = false;
-    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-      const a = points[i];
-      const b = points[j];
-      if (
-        a.y > z !== b.y > z &&
-        x < a.x + ((b.x - a.x) * (z - a.y)) / (b.y - a.y)
-      )
-        result = !result;
+function naturalSurface(parent, depth, color, index) {
+  const soil = [
+    0x9d9275, 0xa98c63, 0x554b5b, 0xaa8758, 0x947456, 0xaa8877, 0x8e7353,
+    0x73878f,
+  ][index];
+  const positions = [];
+  const colors = [];
+  const ground = new T.Color(color);
+  const dirt = new T.Color(soil);
+  const triangle = (...points) => {
+    for (const [x, z, tint] of points) {
+      positions.push(x, 0.004, z);
+      colors.push(tint.r, tint.g, tint.b);
     }
-    return result;
   };
-  for (let row = -10; row <= 10; row++) {
-    for (let col = -10; col <= 10; col++) {
-      const x = col * pitch;
-      const z = row * pitch;
-      const corners = [-0.105, 0.105];
-      if (!corners.every((dx) => corners.every((dz) => inside(x + dx, z + dz))))
-        continue;
-      const paving =
-        industrial ||
-        Math.abs(row) <= 1 ||
-        col === 3 ||
-        (index === 5 && col === -2);
-      const variation = (((row * 13 + col * 19) % 7) + 7) % 7;
-      if (!paving && variation > 3) continue;
-      const paintColor = paving
-        ? industrial && Math.abs(row) === 2
-          ? accent
-          : stone
-        : color;
-      tiles.push({
-        x,
-        z,
-        color: new T.Color(paintColor).multiplyScalar(0.88 + variation * 0.032),
-      });
+  const sections = [
+    [-depth / 2 + 0.015, 0.34, 0],
+    [-depth * 0.31, 0.37, -0.08],
+    [-depth * 0.11, 0.31, 0.06],
+    [depth * 0.12, 0.32, 0.1],
+    [depth * 0.28, 0.29, -0.08],
+    [depth / 2 - 0.04, 0.35, 0],
+  ];
+  for (let j = 1; j < sections.length; j++) {
+    const [x, w, z] = sections[j - 1];
+    const [next, width, center] = sections[j];
+    const a = [x, z, dirt];
+    const b = [next, center, dirt];
+    for (const side of [-1, 1]) {
+      const c = [x, z + w * side, ground];
+      const d = [next, center + width * side, ground];
+      if (side > 0) {
+        triangle(a, c, b);
+        triangle(b, c, d);
+      } else {
+        triangle(a, b, c);
+        triangle(b, d, c);
+      }
     }
   }
-  const surface = new T.InstancedMesh(box, paint(0xffffff), tiles.length);
-  const transform = new T.Object3D();
-  transform.scale.set(0.208, 0.012, 0.208);
-  tiles.forEach((tile, i) => {
-    transform.position.set(tile.x, 0.009, tile.z);
-    transform.updateMatrix();
-    surface.setMatrixAt(i, transform.matrix);
-    surface.setColorAt(i, tile.color);
-  });
-  surface.receiveShadow = true;
-  parent.add(surface);
+  // Irregular patches of bedrock, leaf litter and moss follow the work zones.
+  const shades = woods[index]
+    ? [0x73875c, 0xaa8e6e, index === 5 ? 0xc09a8c : 0x747b4b]
+    : [0x887c70, index === 2 ? 0x453e48 : 0xa48e70, 0x7a8172];
+  for (const [j, x, z, sx, sz] of [
+    [0, -0.55, -0.64, 0.52, 0.25],
+    [1, 0.42, 0.66, 0.87, 0.43],
+    [2, 0.51, -0.67, 0.69, 0.42],
+  ]) {
+    const tint = ground.clone().lerp(new T.Color(shades[j]), 0.83);
+    const edge = (k) => {
+      const a = (k * tau) / 9;
+      const r = 0.75 + ((k * 7 + j * 3 + index) % 5) * 0.065;
+      return [x + sx * r * Math.cos(a), z + sz * r * Math.sin(a), ground];
+    };
+    for (let k = 0; k < 9; k++)
+      triangle([x, z, tint], edge((k + 1) % 9), edge(k));
+  }
+  const geometry = new T.BufferGeometry();
+  geometry.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  mesh(
+    parent,
+    geometry,
+    new T.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.87,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    }),
+    vec(0, 0, 0),
+    [1, 1, 1],
+  );
 }
 
+const fenceStyles = [
+  "panel",
+  "rail",
+  "masonry",
+  "rail",
+  "barrier",
+  "picket",
+  "barrier",
+  "panel",
+];
+
+function fenceRun(parent, length, index) {
+  if (length < 0.1) return;
+  const [stone, wall, accent] = shorePalettes[index];
+  const style = fenceStyles[index];
+  const timber = index === 1 ? 0x684531 : 0x806049;
+  const put = (color, x, y, width, height, thickness) =>
+    mesh(parent, box, color, vec(x, y, 0), [width, height, thickness]);
+  const bays = Math.max(
+    1,
+    Math.round(length / (style === "picket" ? 0.19 : 0.37)),
+  );
+  const pitch = length / bays;
+  if (style === "rail") {
+    for (const y of [0.095, 0.202]) put(timber, 0, y, length, 0.039, 0.039);
+    for (let j = 0; j <= bays; j++)
+      put(
+        index === 1 ? 0xa4724d : 0xb18d62,
+        j * pitch - length / 2,
+        0.133,
+        0.068,
+        0.266,
+        0.066,
+      );
+  } else if (style === "picket") {
+    for (const y of [0.075, 0.158]) put(wall, 0, y, length, 0.034, 0.037);
+    for (let j = 0; j <= bays; j++) {
+      const x = j * pitch - length / 2;
+      const color = j % 3 === 0 ? wall : accent;
+      put(color, x, 0.112, 0.056, 0.224, 0.054);
+      mesh(parent, cone, color, vec(x, 0.245, 0), [0.043, 0.067, 0.043]);
+    }
+  } else if (style === "masonry") {
+    for (let j = 0; j < bays; j++) {
+      const x = (j + 0.5) * pitch - length / 2;
+      put(j % 2 ? 0x716571 : 0x5e5560, x, 0.072, pitch - 0.018, 0.144, 0.115);
+      put(stone, x, 0.157, pitch - 0.012, 0.044, 0.136);
+    }
+    for (let j = 0; j <= bays; j += 2) {
+      const x = j * pitch - length / 2;
+      put(0x655961, x, 0.115, 0.105, 0.23, 0.144);
+      put(accent, x, 0.238, 0.116, 0.025, 0.151);
+    }
+  } else {
+    const hazard = style === "barrier";
+    const panels = hazard
+      ? [0xd4b578, 0xa05239, 0xd8c5a8]
+      : [stone, 0x789ba4, stone];
+    for (let j = 0; j < bays; j++) {
+      const x = (j + 0.5) * pitch - length / 2;
+      put(panels[j % panels.length], x, 0.102, pitch - 0.026, 0.159, 0.07);
+      if (hazard && j % 3 === 1)
+        mesh(
+          parent,
+          sphere,
+          paint(0xffd287, true),
+          vec(x, 0.12, 0.043),
+          [0.032, 0.032, 0.021],
+        );
+    }
+    for (const y of [0.027, 0.194])
+      put(hazard ? 0x665441 : wall, 0, y, length, 0.033, 0.083);
+    for (let j = 0; j <= bays; j++)
+      put(wall, j * pitch - length / 2, 0.116, 0.052, 0.232, 0.093);
+  }
+}
+
+function perimeterFences(parent, shoreline, index) {
+  const posts = new T.Group();
+  for (let j = 0; j < shoreline.length; j++) {
+    const from = shoreline[j].clone().multiplyScalar(0.976);
+    const to = shoreline[(j + 1) % shoreline.length]
+      .clone()
+      .multiplyScalar(0.976);
+    const delta = to.clone().sub(from);
+    const run = (start, end) => {
+      if (end <= start) return;
+      const a = from.clone().addScaledVector(delta, start);
+      const b = from.clone().addScaledVector(delta, end);
+      const segment = new T.Group();
+      segment.position.set((a.x + b.x) / 2, 0, (a.y + b.y) / 2);
+      segment.rotation.y = -Math.atan2(delta.y, delta.x);
+      posts.add(segment);
+      fenceRun(segment, a.distanceTo(b), index);
+    };
+    // Leave full-width access for both the bridge and the waterfront steps.
+    if (from.y * to.y < 0) {
+      const opening = from.x < 0 ? 0.46 : 0.45;
+      const cuts = [-opening, opening]
+        .map((z) => (z - from.y) / delta.y)
+        .sort((a, b) => a - b);
+      run(0, Math.max(0, cuts[0]));
+      run(Math.min(1, cuts[1]), 1);
+    } else run(0, 1);
+  }
+  batchScenery(parent, posts);
+}
+
+// Keep static details in a few draw calls per island, separate from the couriers.
+function batchScenery(parent, details) {
+  details.updateMatrixWorld(true);
+  const groups = new Map();
+  details.traverse((item) => {
+    if (!item.isMesh) return;
+    const key =
+      item.geometry.id + ":" + item.material.id + ":" + item.castShadow;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  for (const group of groups.values()) {
+    const first = group[0];
+    const instances = new T.InstancedMesh(
+      first.geometry,
+      first.material,
+      group.length,
+    );
+    instances.castShadow = first.castShadow;
+    instances.receiveShadow = first.receiveShadow;
+    group.forEach((item, i) => instances.setMatrixAt(i, item.matrixWorld));
+    parent.add(instances);
+  }
+}
 function decorateWalls(parent, points, index) {
   const [stone, wall, accent] = shorePalettes[index];
+  const details = new T.Group();
   for (let i = 0; i < points.length; i++) {
     const from = points[i];
     const to = points[(i + 1) % points.length];
@@ -216,7 +372,7 @@ function decorateWalls(parent, points, index) {
     const edge = new T.Group();
     edge.position.set((from.x + to.x) / 2, 0, (from.y + to.y) / 2);
     edge.rotation.y = -Math.atan2(to.y - from.y, to.x - from.x);
-    parent.add(edge);
+    details.add(edge);
     mesh(edge, box, wall, vec(0, -0.175, 0), [length, 0.29, 0.055]);
     mesh(edge, box, stone, vec(0, -0.04, 0), [length, 0.07, 0.095]);
     mesh(edge, box, wall, vec(0, -0.304, 0), [length, 0.055, 0.083]);
@@ -230,6 +386,7 @@ function decorateWalls(parent, points, index) {
       ]);
     }
   }
+  batchScenery(parent, details);
 }
 
 function waterfrontDeck(parent, edge, index) {
@@ -317,8 +474,9 @@ function outerIsland(parent, depth, color, index) {
     .getPoints()
     .slice(0, -1)
     .map((point) => new T.Vector2(point.x, -point.y));
-  pavedSurface(parent, shoreline, color, index);
+  naturalSurface(parent, depth, color, index);
   decorateWalls(parent, shoreline, index);
+  perimeterFences(parent, shoreline, index);
   waterfrontDeck(parent, depth / 2 + (index === 2 ? 0.13 : 0), index);
   if (index !== 7)
     mesh(parent, rock, 0x424554, vec(0.38, -0.48, 0), [
@@ -688,6 +846,169 @@ function workshop(parent, point, index) {
   );
 }
 
+function workyard(parent, depth, index) {
+  const site = new T.Group();
+  const animations = [];
+  const lumber = Boolean(woods[index]);
+  const [, bark] = grove[index];
+  const [stone, wall, accent] = shorePalettes[index];
+  const machine = (x, z, scale = 1, rotation = 0) => {
+    const mount = new T.Group();
+    mount.position.set(x, 0, z);
+    mount.rotation.y = rotation;
+    mount.scale.setScalar(scale);
+    parent.add(mount);
+    const animate = workshop(mount, vec(0, 0, 0), index);
+    if (animate) animations.push(animate);
+  };
+  if (index === 4 || index === 6) {
+    machine(0.34, -0.57, 1, index === 4 ? -0.24 : 0.3);
+    machine(depth * 0.35, 0.39, 0.76, index === 4 ? 0.28 : -0.3);
+  } else if (index === 2) {
+    machine(0.8, -0.54, 0.96, -0.64);
+  } else {
+    machine(depth * 0.33, lumber ? -0.45 : 0.19, 1, 0.31);
+  }
+  const crate = (x, z, size, color) => {
+    mesh(site, box, color, vec(x, size * 0.34, z), [
+      size,
+      size * 0.68,
+      size * 0.78,
+    ]);
+    for (const dx of [-0.32, 0.32])
+      mesh(site, box, stone, vec(x + dx * size, size * 0.36, z), [
+        size * 0.105,
+        size * 0.72,
+        size * 0.81,
+      ]);
+  };
+  if (lumber) {
+    const groveLayout = [
+      [-0.81, 0.51, 0.73],
+      [-0.36, 0.59, 0.93],
+      [0.08, 0.67, 0.67],
+      [0.49, 0.7, 0.98],
+      [0.93, 0.79, 0.78],
+      [depth * 0.39, 0.48, 0.65],
+      [0.02, -0.57, 0.69],
+      [-0.55, -0.59, 0.55],
+    ];
+    const spacing = index === 5 ? 0.89 : index === 3 ? 0.96 : 1;
+    groveLayout.forEach(([x, z, size], j) =>
+      tree(
+        site,
+        vec(x * spacing, 0, z),
+        index,
+        size * (j % 2 ? spacing : 1),
+        j,
+      ),
+    );
+    for (const [x, z] of [
+      [0.38, -0.45],
+      [0.59, -0.63],
+    ]) {
+      mesh(site, cylinder, bark, vec(x, 0.071, z), [0.12, 0.14, 0.12]);
+      mesh(site, cylinder, 0xe3b989, vec(x, 0.144, z), [0.105, 0.013, 0.105]);
+    }
+    for (let j = 0; j < 5; j++) {
+      const top = j > 2;
+      const z = -0.55 + (top ? j - 2.5 : j) * 0.115;
+      log(site, vec(-0.5, top ? 0.14 : 0.057, z), bark, 0.67).rotation.y = 0.12;
+    }
+    crate(depth * 0.37, -0.72, 0.19, bark);
+    for (let j = 0; j < 15; j++) {
+      const x = -0.9 + (((j * 17) % 23) / 23) * 2.05;
+      const z = (j % 2 ? -1 : 1) * (0.46 + ((j * 7) % 9) * 0.05);
+      const tint =
+        index === 5 && j % 3 === 0 ? 0xe5a9ab : j % 2 ? 0x6f8354 : 0x879b61;
+      if (Math.abs(z) > 0.65 + x * 0.29) continue;
+      const size = 0.035 + (j % 4) * 0.016;
+      mesh(site, rock, tint, vec(x, size * 0.58, z), [
+        size * 1.3,
+        size,
+        size * 0.87,
+      ]);
+    }
+  } else if (index === 2) {
+    for (let j = 0; j < 18; j++) {
+      const pile = j < 10;
+      const n = j % 10;
+      const x = (pile ? 0.69 : -0.49) + (((n * 11) % 9) - 4) * 0.08;
+      const z = (pile ? 0.55 : -0.52) + (((n * 7) % 9) - 4) * 0.043;
+      const size = 0.068 + (n % 4) * 0.025;
+      mesh(
+        site,
+        rock,
+        [0x393543, 0x514958, 0x655a63][j % 3],
+        vec(x, size * (j % 2 ? 1.1 : 0.6), z),
+        [size * 1.25, size, size],
+        true,
+      );
+    }
+    for (const z of [0.42, 0.62]) {
+      mesh(site, box, wall, vec(-0.62, 0.043, z), [0.71, 0.036, 0.024]);
+      for (let j = 0; j < 5; j++)
+        mesh(
+          site,
+          box,
+          0x695649,
+          vec(-0.92 + j * 0.14, 0.02, 0.52),
+          [0.055, 0.032, 0.3],
+        );
+    }
+    mesh(site, box, 0xa26442, vec(-0.53, 0.16, 0.52), [0.31, 0.17, 0.2]);
+    mesh(site, rock, 0x393543, vec(-0.53, 0.24, 0.52), [0.14, 0.09, 0.091]);
+    for (const x of [-0.62, -0.44])
+      for (const z of [0.425, 0.615])
+        mesh(
+          site,
+          cylinder,
+          0x504b55,
+          vec(x, 0.082, z),
+          [0.054, 0.031, 0.054],
+        ).rotation.x = Math.PI / 2;
+    crate(1.22, -0.71, 0.22, 0x835c47);
+  } else {
+    for (const side of [-1, 1]) {
+      const x = side < 0 ? -0.65 : 0.56;
+      const z = side < 0 ? -0.57 : 0.63;
+      if (index === 0 && side === 1) continue;
+      mesh(site, box, 0x6f6152, vec(x, 0.022, z), [0.43, 0.044, 0.39]);
+      for (const dx of [-0.105, 0.105])
+        for (const dz of [-0.1, 0.1])
+          fuel(site, vec(x + dx, 0.165, z + dz), index);
+    }
+    crate(-0.68, 0.51, 0.29, index === 7 ? 0xc98953 : 0x866a53);
+    crate(-0.36, 0.55, 0.19, wall);
+    const pipeX = depth * 0.34;
+    const pipeZ = index === 0 ? -0.49 : -0.82;
+    for (const z of [pipeZ - 0.1, pipeZ + 0.1]) {
+      mesh(
+        site,
+        cylinder,
+        index === 0 ? 0x5c8a88 : 0x8b7056,
+        vec(pipeX, 0.102, z),
+        [0.047, 0.52, 0.047],
+      ).rotation.z = Math.PI / 2;
+      for (const x of [pipeX - 0.21, pipeX + 0.21])
+        mesh(site, cylinder, accent, vec(x, 0.081, z), [0.064, 0.156, 0.064]);
+    }
+    if (index !== 7) {
+      for (let j = 0; j < 7; j++) {
+        const x = -0.55 + j * 0.19;
+        const z = j < 4 ? 0.45 + j * 0.078 : -0.73;
+        const size = 0.039 + (j % 3) * 0.017;
+        mesh(site, rock, j % 2 ? 0x81786b : 0xa99675, vec(x, size * 0.6, z), [
+          size,
+          size,
+          size * 1.3,
+        ]);
+      }
+    }
+  }
+  batchScenery(parent, site);
+  return (time) => animations.forEach((animate, j) => animate(time + j * 0.83));
+}
 function hearth(root, mist) {
   const flame = new T.Group();
   flame.position.y = 0.59;
@@ -897,6 +1218,23 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     8,
   );
   mesh(hub, base, 0x8a936b, vec(0, -0.175, 0), [1, 1, 1], true);
+  const rim = new T.Group();
+  const halfSide = coreEdge * Math.tan(Math.PI / 8);
+  const gate = 0.46;
+  for (let i = 0; i < 8; i++) {
+    const angle = ((i + 0.5) * tau) / 8;
+    for (const side of [-1, 1]) {
+      const edge = new T.Group();
+      edge.position.copy(polar(coreEdge - 0.058, angle));
+      edge.rotation.y = -angle;
+      rim.add(edge);
+      const middle = (side * (gate + halfSide)) / 2;
+      const span = halfSide - gate;
+      mesh(edge, box, 0x7d796e, vec(0, 0.06, middle), [0.12, 0.12, span]);
+      mesh(edge, box, 0xb7a688, vec(0, 0.135, middle), [0.15, 0.036, span]);
+    }
+  }
+  batchScenery(hub, rim);
   const sleepMaterial = makeSleeper();
   const fire = hearth(hub, mist);
   const lanterns = [];
@@ -922,7 +1260,6 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
   pillars.forEach((pillar, i) => {
     const a = ((i + 0.5) * tau) / 8;
     const depth = islandDepths[i];
-    const width = 1.7;
     const center = polar(innerEdge + depth / 2, a);
     const outward = polar(1, a);
     const lateral = vec(-outward.z, 0, outward.x);
@@ -932,7 +1269,6 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     land.userData.pillar = i;
     root.add(land);
     pickables.push(land);
-    const industrial = !woods[i];
     const terrain = [
       0x6e8b69, 0x96a76e, 0x716576, 0xb0a072, 0xb89c73, 0x8a946f, 0xa39461,
       0x657f8d,
@@ -952,97 +1288,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
         );
       }
     }
-    for (let j = 0; j < 6; j++) {
-      const angle = (j * tau) / 6;
-      mesh(
-        land,
-        box,
-        0xc7bca2,
-        polar(1.48, angle, 0.02),
-        [0.2, 0.035, 0.13],
-      ).rotation.y = -angle;
-      mesh(
-        land,
-        rock,
-        industrial ? 0x87828a : 0x76926d,
-        polar(1.37, angle + 0.19, 0.075),
-        [0.13, 0.13, 0.11],
-      );
-    }
-    for (let j = 0; j < 5; j++) {
-      const tile = outward
-        .clone()
-        .multiplyScalar(0.24 - j * 0.23)
-        .setY(0.025);
-      mesh(
-        land,
-        box,
-        j % 2 ? 0xb3a18b : 0xc8b69e,
-        tile,
-        [0.19, 0.036, 0.43],
-      ).rotation.y = -a;
-    }
-    const machinery = workshop(
-      land,
-      outward
-        .clone()
-        .multiplyScalar(industrial ? 0.57 : depth * 0.44)
-        .addScaledVector(lateral, industrial ? 0 : width * 0.38),
-      i,
-    );
-    const stump = outward
-      .clone()
-      .multiplyScalar(0.36)
-      .addScaledVector(lateral, -0.32);
-    const [leaf, bark] = grove[i];
-    if (!industrial) {
-      mesh(
-        land,
-        cylinder,
-        bark,
-        stump.clone().setY(0.103),
-        [0.151, 0.2, 0.151],
-        true,
-      );
-      mesh(
-        land,
-        cylinder,
-        0xe3b989,
-        stump.clone().setY(0.21),
-        [0.125, 0.018, 0.125],
-      );
-      for (let j = 0; j < 3; j++) {
-        tree(
-          land,
-          outward
-            .clone()
-            .multiplyScalar(depth * (0.35 + j * 0.18))
-            .addScaledVector(lateral, width * [0.39, -0.48, 0.15][j]),
-          i,
-          [0.95, 0.77, 0.62][j],
-        );
-      }
-      for (let j = 0; j < 3; j++) {
-        const p = stump
-          .clone()
-          .addScaledVector(lateral, -0.27)
-          .addScaledVector(outward, j * 0.115)
-          .setY(0.087 + (j % 2) * 0.13);
-        fuel(land, p, i).rotation.y = a;
-      }
-    } else {
-      for (let j = 0; j < 3; j++) {
-        fuel(
-          land,
-          lateral
-            .clone()
-            .multiplyScalar(-0.51)
-            .addScaledVector(outward, -0.28 + j * 0.22)
-            .setY(0.12),
-          i,
-        );
-      }
-    }
+    const machinery = workyard(shore, depth, i);
     const heading = outward.clone().negate();
     const ramp = polar(innerEdge + 0.06, a);
     const entrance = polar(coreEdge - 0.06, a);
@@ -1064,15 +1310,25 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       const cargo = fuel(actor.upper, vec(0, 0.26, 0.23), i);
       cargo.visible = false;
       root.add(actor.root);
+      const side = j < 4 ? -1 : 1;
+      const row = j % 4;
+      const x = depth * (-0.13 + row * 0.133);
+      const restZ = (innerEdge + depth / 2 + x) * Math.tan(Math.PI / 8) - 0.35;
       const home = center
         .clone()
-        .addScaledVector(outward, -0.25 + (j % 4) * 0.29)
-        .addScaledVector(lateral, j < 4 ? -0.75 : 0.77);
-      actor.root.position.copy(home);
+        .addScaledVector(outward, x)
+        .addScaledVector(lateral, side * restZ);
+      const loading = center
+        .clone()
+        .addScaledVector(outward, 0.05 + row * 0.19)
+        .addScaledVector(lateral, side * (0.11 + (row % 2) * 0.1));
+      const restYaw = -a + (side < 0 ? Math.PI : 0);
+      actor.root.position.copy(checked ? loading : home);
+      actor.root.rotation.y = restYaw;
       const lane = ((j % 2) - 0.5) * 0.15;
       const offset = vec(-heading.z * lane, 0, heading.x * lane);
       const path = [
-        home,
+        loading,
         ramp.clone().add(offset),
         entrance.clone().add(offset),
       ];
@@ -1082,6 +1338,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
         sleep,
         cargo,
         home,
+        restYaw,
         path,
         elapsed: checked ? -0.2 - j * 0.64 : 0,
         checked,
@@ -1131,7 +1388,10 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
   }
 
   function rest(worker) {
-    worker.actor.root.position.copy(worker.home);
+    worker.actor.root.position.copy(
+      worker.checked ? worker.path[0] : worker.home,
+    );
+    worker.actor.root.rotation.y = worker.restYaw;
     worker.actor.pose.rotation.x = worker.checked ? 0 : -Math.PI / 2;
     worker.actor.pose.position.y = worker.checked ? 0 : 0.13;
     worker.sleep.visible = !worker.checked;
@@ -1154,7 +1414,10 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     worker.actor.pose.position.y = 0;
     worker.sleep.visible = false;
     worker.elapsed += delta;
-    if (worker.elapsed < 0) return;
+    if (worker.elapsed < 0) {
+      rest(worker);
+      return;
+    }
     const { actor, path } = worker;
     const outbound = 3.9;
     const cycle = 8.4;
