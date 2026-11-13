@@ -22,17 +22,19 @@ export const workshops = [
   ["金合歡壓製場", "木質燃料磚", "塊"],
   ["海上鑽油平台", "原油", "桶"],
 ];
-const hexRadius = 1.82;
-const hexStep = 3.38;
-const axial = [
-  [1, 0],
-  [0, 1],
-  [-1, 1],
-  [-1, 0],
-  [0, -1],
-  [1, -1],
-  [-1, 2],
-  [1, -2],
+const coreEdge = 1.67;
+const bridgeSpan = 0.92;
+const innerEdge = coreEdge + bridgeSpan;
+const islandDepths = [2.85, 3.12, 3.42, 3.05, 3.25, 2.68, 2.95, 3.08];
+const bridgeStyles = [
+  [0xa87348, 0x674532, 0.62, "wood"],
+  [0xd9c09d, 0x766956, 0.65, "rope"],
+  [0x737787, 0xc08c54, 0.69, "rail"],
+  [0xc3af80, 0x8b795f, 0.72, "stone"],
+  [0x647b78, 0xe0ad55, 0.7, "truss"],
+  [0xb46b6a, 0xf0baa9, 0.64, "arch"],
+  [0xb88c54, 0x84663d, 0.67, "covered"],
+  [0x526b87, 0xe7b55d, 0.74, "pier"],
 ];
 const uniforms = [
   0xd88a58, 0x819fc2, 0x8c9d68, 0xc98eaa, 0xd9b66a, 0x69a29f, 0xa58dc0,
@@ -137,22 +139,59 @@ function tree(parent, point, kind, scale) {
   }
 }
 
-function island(parent, depth, color, width = depth, sides = 6) {
-  const coast = new T.CylinderGeometry(1, 0.89, 1, sides);
-  if (sides === 4) coast.rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
-  mesh(parent, coast, 0x544f50, vec(0, -0.18, 0), [depth, 0.3, width], true);
-  mesh(parent, rock, 0x3c414d, vec(0, -0.64, 0), [
-    depth * 0.88,
-    0.46,
-    width * 0.88,
-  ]);
-  mesh(parent, coast, color, vec(0, -0.048, 0), [depth, 0.096, width], true);
+function outerIsland(parent, depth, color, index) {
+  const inside = innerEdge * Math.tan(Math.PI / 8) - 0.13;
+  const outside = (innerEdge + depth) * Math.tan(Math.PI / 8) - 0.16;
+  const bevel = index === 7 ? 0.08 : 0.24 + (index % 3) * 0.12;
+  const outline = new T.Shape();
+  outline.moveTo(-depth / 2, -inside);
+  outline.lineTo(depth / 2 - bevel, -outside + 0.17);
+  outline.lineTo(depth / 2, -outside + bevel);
+  outline.lineTo(depth / 2 + (index === 2 ? 0.27 : 0), outside - bevel);
+  outline.lineTo(depth / 2 - bevel, outside - 0.17);
+  outline.lineTo(-depth / 2, inside);
+  outline.closePath();
+  const geometry = new T.ExtrudeGeometry(outline, {
+    depth: 0.31,
+    bevelEnabled: false,
+  });
+  geometry.rotateX(-Math.PI / 2).translate(0, -0.31, 0);
+  mesh(parent, geometry, color, vec(0, 0, 0), [1, 1, 1], true);
+  if (index !== 7)
+    mesh(parent, rock, 0x424554, vec(0.38, -0.48, 0), [
+      depth * 0.43,
+      0.39,
+      outside * 0.76,
+    ]);
 }
 
-function courier(color, bark) {
+function makeSleeper() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  ctx.font = "bold 40px sans-serif";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "#192844";
+  ctx.fillStyle = "#e6f4ff";
+  ctx.strokeText("zzz", 64, 48);
+  ctx.fillText("zzz", 64, 48);
+  const texture = new T.CanvasTexture(canvas);
+  texture.colorSpace = T.SRGBColorSpace;
+  return new T.SpriteMaterial({
+    map: texture,
+    depthWrite: false,
+    toneMapped: false,
+  });
+}
+
+function courier(color, index) {
   const root = new T.Group();
+  const pose = new T.Group();
+  root.add(pose);
   const upper = new T.Group();
-  root.add(upper);
+  pose.add(upper);
   mesh(upper, sphere, color, vec(0, 0.27, 0), [0.143, 0.19, 0.11], true);
   mesh(
     upper,
@@ -163,7 +202,26 @@ function courier(color, bark) {
     true,
   );
   mesh(upper, sphere, 0x4b3731, vec(0, 0.632, 0.005), [0.159, 0.078, 0.14]);
-  mesh(upper, sphere, color, vec(0, 0.682, -0.005), [0.126, 0.06, 0.115]);
+  const mining = index === 2;
+  const oil = index === 4 || index === 7;
+  const helmet = mining ? 0xeeb32e : oil ? 0xf4f0dc : 0x9b4b3f;
+  mesh(upper, sphere, helmet, vec(0, 0.657, 0), [0.168, 0.104, 0.154]);
+  mesh(upper, box, helmet, vec(0, 0.633, 0.115), [0.27, 0.025, 0.16]);
+  if (mining)
+    mesh(
+      upper,
+      sphere,
+      paint(0xfff1a4, true),
+      vec(0, 0.663, 0.155),
+      [0.043, 0.035, 0.026],
+    );
+  if (oil) {
+    for (const y of [0.25, 0.32])
+      mesh(upper, box, 0xf3ce66, vec(0, y, 0.097), [0.22, 0.024, 0.035]);
+  } else if (!mining) {
+    for (const x of [-0.064, 0.064])
+      mesh(upper, box, 0x574334, vec(x, 0.31, 0.099), [0.031, 0.18, 0.033]);
+  }
   const arms = [],
     legs = [];
   for (const side of [-1, 1]) {
@@ -182,55 +240,80 @@ function courier(color, bark) {
     arms.push(arm);
     const leg = new T.Group();
     leg.position.set(side * 0.067, 0.145, 0);
-    root.add(leg);
+    pose.add(leg);
     mesh(leg, box, 0x38374a, vec(0, -0.075, 0.027), [0.084, 0.15, 0.127]);
     legs.push(leg);
   }
-  const bundle = log(upper, vec(0, 0.25, 0.19), bark, 1.08);
-  bundle.visible = false;
-  const axe = new T.Group();
-  axe.position.set(0, -0.16, 0.05);
-  mesh(axe, cylinder, 0x8c5636, vec(0, -0.12, 0), [0.018, 0.28, 0.018]);
-  mesh(axe, box, 0xb9c8cc, vec(0.044, -0.25, 0), [0.12, 0.085, 0.046]);
-  arms[1].add(axe);
-  axe.visible = false;
-  return { root, upper, arms, legs, bundle, axe };
+  return { root, pose, upper, arms, legs };
 }
 
-function bridge(parent, from, to) {
-  const mid = from.clone().lerp(to, 0.5);
-  const width = from.distanceTo(to);
+function bridge(parent, from, to, index) {
+  const [deck, trim, breadth, style] = bridgeStyles[index];
+  const length = from.distanceTo(to);
   const group = new T.Group();
-  group.position.copy(mid);
+  group.position.copy(from).lerp(to, 0.5);
   group.rotation.y = -Math.atan2(to.z - from.z, to.x - from.x);
   parent.add(group);
-  mesh(group, box, 0x785845, vec(0, -0.087, 0), [width, 0.12, 0.48]);
-  const count = Math.ceil(width / 0.14);
+  mesh(group, box, deck, vec(0, -0.06, 0), [length, 0.11, breadth], true);
+  const count = Math.ceil(length / 0.12);
   for (let i = 0; i < count; i++) {
     mesh(
       group,
       box,
-      i % 3 ? 0xb58b66 : 0xc19b75,
-      vec(((i + 0.5) * width) / count - width / 2, -0.014, 0),
-      [width / count - 0.012, 0.044, 0.47],
+      i % 2 ? deck : new T.Color(deck).multiplyScalar(0.91).getHex(),
+      vec(((i + 0.5) * length) / count - length / 2, -0.009, 0),
+      [length / count - 0.011, 0.032, breadth * 0.97],
     );
   }
   for (const side of [-1, 1]) {
-    mesh(group, box, 0x996c50, vec(0, 0.22, side * 0.24), [
-      width,
-      0.028,
-      0.035,
+    const z = side * breadth * 0.47;
+    const railY = style === "rail" ? 0.022 : style === "stone" ? 0.13 : 0.24;
+    mesh(group, box, trim, vec(0, railY, z), [
+      length,
+      style === "stone" ? 0.19 : 0.035,
+      0.048,
     ]);
-    for (const x of [-width / 2, 0, width / 2]) {
-      mesh(
-        group,
-        box,
-        0x88634d,
-        vec(x, 0.1, side * 0.24),
-        [0.055, 0.26, 0.052],
+    if (style === "rail") continue;
+    for (const x of [-length * 0.44, 0, length * 0.44]) {
+      const height =
+        style === "pier" ? 0.36 : style === "covered" ? 0.65 : 0.31;
+      mesh(group, box, trim, vec(x, height / 2, z), [0.05, height, 0.05]);
+      if (style === "pier")
+        mesh(
+          group,
+          sphere,
+          paint(0xffd487, true),
+          vec(x, height, z),
+          [0.052, 0.052, 0.052],
+        );
+      if (style === "truss")
+        mesh(
+          group,
+          box,
+          trim,
+          vec(x, 0.13, z),
+          [0.036, 0.32, 0.036],
+        ).rotation.z = 0.63;
+    }
+    if (style === "rope" || style === "arch") {
+      const height = style === "arch" ? 0.29 : -0.14;
+      const points = Array.from({ length: 9 }, (_, j) =>
+        vec(
+          (j / 8 - 0.5) * length,
+          0.29 + Math.sin((j * Math.PI) / 8) * height,
+          z,
+        ),
+      );
+      group.add(
+        new T.Line(
+          new T.BufferGeometry().setFromPoints(points),
+          new T.LineBasicMaterial({ color: trim }),
+        ),
       );
     }
   }
+  if (style === "covered")
+    mesh(group, box, trim, vec(0, 0.65, 0), [length, 0.08, breadth + 0.13]);
 }
 
 function fuel(parent, point, index) {
@@ -600,7 +683,14 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
   const scenery = landscape(root);
   const hub = new T.Group();
   root.add(hub);
-  island(hub, hexRadius, 0x8a936b);
+  const base = new T.CylinderGeometry(
+    coreEdge / Math.cos(Math.PI / 8),
+    1.59,
+    0.35,
+    8,
+  );
+  mesh(hub, base, 0x8a936b, vec(0, -0.175, 0), [1, 1, 1], true);
+  const sleepMaterial = makeSleeper();
   const fire = hearth(hub, mist);
   const lanterns = [];
   for (let i = 0; i < 8; i++) {
@@ -623,17 +713,12 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
   const pickables = [hub];
   hub.userData.pillar = 8;
   pillars.forEach((pillar, i) => {
-    const [q, r] = axial[i];
-    const center = vec(
-      hexStep * (q + r / 2),
-      0,
-      ((hexStep * Math.sqrt(3)) / 2) * r,
-    );
-    const a = Math.atan2(center.z, center.x);
+    const a = ((i + 0.5) * tau) / 8;
+    const depth = islandDepths[i];
+    const width = 1.7;
+    const center = polar(innerEdge + depth / 2, a);
     const outward = polar(1, a);
     const lateral = vec(-outward.z, 0, outward.x);
-    const depth = hexRadius;
-    const width = hexRadius;
     centers.push(center);
     const land = new T.Group();
     land.position.copy(center);
@@ -645,7 +730,10 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       0x6e8b69, 0x96a76e, 0x716576, 0xb0a072, 0xb89c73, 0x8a946f, 0xa39461,
       0x657f8d,
     ][i];
-    island(land, depth, terrain);
+    const shore = new T.Group();
+    shore.rotation.y = -a;
+    land.add(shore);
+    outerIsland(shore, depth, terrain, i);
     if (i === 7) {
       for (let j = 0; j < 6; j++) {
         mesh(
@@ -748,18 +836,24 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
         );
       }
     }
-    const via = i >= 6 ? centers[i === 6 ? 2 : 5] : null;
-    const heading = (via ?? vec(0, 0, 0)).clone().sub(center).normalize();
-    const edge = hexRadius * Math.cos(Math.PI / 6);
-    const ramp = center.clone().addScaledVector(heading, edge - 0.12);
-    const entrance = via
-      ? via.clone().addScaledVector(heading, -edge + 0.12)
-      : heading.clone().multiplyScalar(-edge + 0.12);
-    bridge(root, ramp, entrance);
+    const heading = outward.clone().negate();
+    const ramp = polar(innerEdge + 0.06, a);
+    const entrance = polar(coreEdge - 0.06, a);
+    bridge(root, ramp, entrance, i);
     const workers = pillar.checked.map((checked, j) => {
-      const actor = courier(uniforms[(i + j) % uniforms.length], bark);
+      const actor = courier(
+        i === 2
+          ? 0x555c69
+          : i === 4 || i === 7
+            ? 0x267a83
+            : uniforms[(i + (j % 2)) % uniforms.length],
+        i,
+      );
       actor.root.scale.setScalar(0.72);
-      actor.axe.visible = actor.bundle.visible = false;
+      const sleep = new T.Sprite(sleepMaterial);
+      sleep.position.set(0, 0.58, 0.32);
+      sleep.scale.set(0.56, 0.28, 1);
+      actor.root.add(sleep);
       const cargo = fuel(actor.upper, vec(0, 0.26, 0.23), i);
       cargo.visible = false;
       root.add(actor.root);
@@ -775,17 +869,10 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
         ramp.clone().add(offset),
         entrance.clone().add(offset),
       ];
-      if (via) {
-        const toHub = via.clone().normalize();
-        path.push(
-          via.clone().addScaledVector(toHub, -0.3),
-          via.clone().addScaledVector(toHub, -edge + 0.12),
-          toHub.multiplyScalar(edge - 0.12),
-        );
-      }
       path.push(polar(0.87, a + lane));
       return {
         actor,
+        sleep,
         cargo,
         home,
         path,
@@ -838,6 +925,9 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
 
   function rest(worker) {
     worker.actor.root.position.copy(worker.home);
+    worker.actor.pose.rotation.x = worker.checked ? 0 : Math.PI / 2;
+    worker.actor.pose.position.y = worker.checked ? 0 : 0.13;
+    worker.sleep.visible = !worker.checked;
     worker.actor.upper.position.y = 0;
     worker.actor.legs.forEach((leg) => {
       leg.rotation.x = 0;
@@ -853,6 +943,9 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       rest(worker);
       return;
     }
+    worker.actor.pose.rotation.x = 0;
+    worker.actor.pose.position.y = 0;
+    worker.sleep.visible = false;
     worker.elapsed += delta;
     if (worker.elapsed < 0) return;
     const { actor, path } = worker;
@@ -899,6 +992,9 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       ...centers.map((point) => point.clone().setY(1.15)),
       vec(0, 1.3, 0),
     ],
+    dispose() {
+      sleepMaterial.map.dispose();
+    },
     setTime: scenery.setTime,
     highlight,
     refresh(change, motion) {

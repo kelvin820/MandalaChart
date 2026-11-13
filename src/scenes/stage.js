@@ -226,6 +226,7 @@ export function mountStage(
   function buildModel() {
     if (model) {
       scene.remove(model.root);
+      model.dispose?.();
       disposeObjects(model.root);
     }
     model = hero
@@ -424,6 +425,7 @@ export function mountStage(
     canvas.removeEventListener("pointerleave", leave);
     canvas.removeEventListener("webglcontextlost", lost);
     controls?.dispose();
+    model?.dispose?.();
     disposeObjects(scene);
     halo.dispose();
     environment.dispose();
