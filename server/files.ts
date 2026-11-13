@@ -40,8 +40,8 @@ export async function createPdf(png: Uint8Array, chart: Chart) {
   doc.setCreationDate(new Date(chart.createdAt));
   doc.setModificationDate(new Date());
   const image = await doc.embedPng(png),
-    page = doc.addPage(PageSizes.A3),
-    margin = 24;
+    page = doc.addPage([PageSizes.A3[1], PageSizes.A3[0]]),
+    margin = 16;
   const fit = image.scale(
     Math.min(
       (page.getWidth() - margin * 2) / image.width,

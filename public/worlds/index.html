@@ -8,71 +8,95 @@
       content="讓願望有形，讓每一步都有方向。探索四種立體曼陀羅模型。"
     />
     <title>目標之境 · Mandala</title>
+    <meta name="theme-color" content="#111119" />
+    <link rel="stylesheet" href="/theme.css" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="icon" type="image/svg+xml" href="/brand/mandala.svg" />
   </head>
   <body>
     <header>
-      <a class="brand" href="#"
-        >✳ <span>目標之境<small>MANDALA LAB</small></span></a
-      ><span class="edition">INTERACTIVE CONCEPT / 001</span
-      ><button id="export">↗ 匯出曼陀羅表</button>
+      <div class="brand">
+        <img
+          class="brand-logo"
+          src="/brand/mandala.svg"
+          width="48"
+          height="48"
+          alt=""
+        />
+        <span>目標之境<small>MANDALA LAB</small></span>
+      </div>
+      <button id="export" hidden>↗ 匯出曼陀羅表</button>
     </header>
     <main>
-      <section class="intro">
-        <div class="eyebrow">A LITTLE STRUCTURE. A BIG POSSIBILITY.</div>
-        <h1>讓願望，<em>有形。</em></h1>
-        <p>
-          一個核心目標，八個支柱，六十四個開始的可能。<br />換一個視角，看見小小行動如何支撐你想去的地方。
-        </p>
-      </section>
+      <p id="sample" class="sample" hidden>範例目標 · 可試用行動勾選</p>
       <nav id="modes" aria-label="模型選擇"></nav>
       <div class="workspace">
         <section class="viewport">
           <div class="scene-title">
-            <span id="sceneNo">01 / LANDSCAPE</span>
             <h2 id="sceneName">八脊之山</h2>
             <p id="sceneDescription"></p>
           </div>
           <canvas id="scene" aria-label="可拖曳旋轉的立體目標模型"></canvas>
+          <div id="islandLabels" hidden></div>
+          <div class="island-tools" hidden>
+            <div id="daylight" role="group" aria-label="島嶼時段">
+              <button type="button" data-time="dawn" aria-pressed="false">
+                清晨
+              </button>
+              <button type="button" data-time="day" aria-pressed="false">
+                白天
+              </button>
+              <button type="button" data-time="dusk" aria-pressed="false">
+                黃昏
+              </button>
+              <button type="button" data-time="night" aria-pressed="true">
+                夜晚
+              </button>
+            </div>
+            <button type="button" id="islandOverview">回到全景</button>
+            <button type="button" id="toggleLabels" aria-pressed="true">島嶼名牌</button>
+          </div>
+          <p id="delivery" class="delivery-status" role="status"></p>
+          <p id="sceneUnavailable" role="status" hidden>
+            這個瀏覽器目前無法顯示 3D。你仍可選取支柱，查看每項行動。
+          </p>
           <div class="goal-label">
-            <span>YOUR NORTH STAR</span
-            ><input id="goal" aria-label="核心目標" maxlength="45" />
+            <span>核心目標</span>
+            <strong id="goal"></strong>
+            <div class="crystal-progress" aria-live="polite">
+              <span id="crystalCount"></span>
+              <progress
+                id="crystalProgress"
+                aria-label="全表行動完成進度"
+                max="64"
+                value="0"
+              ></progress>
+            </div>
           </div>
           <div class="scene-footer">
             <span>拖曳旋轉 · 滾輪縮放 · 點選支柱</span>
             <div>
               <button id="rotate" aria-pressed="true">Ⅱ 暫停旋轉</button
               ><button id="replay">↻ 重播生成</button
-              ><button id="flat" hidden>▦ 平面 / 立體</button>
+              ><button id="flat" aria-pressed="false" hidden>▦ 平面視圖</button>
             </div>
           </div>
-          <div class="legend"><i></i> 目標高度代表結構層級，並非完成進度</div>
+          <div class="legend"><i></i> 金色標記代表已完成的行動</div>
         </section>
         <aside>
           <div class="aside-top">
-            <span>EXPLORE A PILLAR</span><span id="pillarNumber">01 / 08</span>
+            <span>探索支柱</span><span id="pillarNumber">1 / 8</span>
           </div>
           <div id="pillars" aria-label="八個支柱"></div>
-          <div class="pillar-heading">
-            <span id="pillarDot"></span
-            ><input id="pillarName" aria-label="支柱名稱" maxlength="20" />
-          </div>
-          <p class="hint">
-            從能力到行動。點擊文字即可調整，勾選你想優先開始的項目。
-          </p>
-          <div id="actions"></div>
+          <h3 id="pillarName"></h3>
+          <p id="islandWood" hidden></p>
+          <ol id="actions" aria-labelledby="pillarName"></ol>
           <div class="aside-bottom">
-            <span id="chosen"></span><span>回到表格即可編輯</span>
+            <span id="chosen"></span
+            ><span id="checkStatus" role="status"></span>
           </div>
         </aside>
       </div>
-      <footer>
-        <span>01 個願望 <b>／</b> 08 個支柱 <b>／</b> 64 個原子行動</span
-        ><span>先有方向，再走出自己的路。 <i>✳</i></span>
-      </footer>
-      <p class="prototype">
-        互動概念原型 · 使用英文簡報目標示範 · 尚未串接 LLM
-      </p>
     </main>
     <dialog id="exportDialog">
       <div class="dialog-head">
@@ -86,6 +110,6 @@
         ><button id="print">列印 / PDF</button>
       </div>
     </dialog>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

@@ -12,6 +12,7 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
     const path = typeof url === "string" ? url : url.url;
     let body: any = {},
       status = 200;
+    if (path === "/fonts/noto-serif-tc-ui.woff2") return new Response(new Uint8Array([0]));
     if (path === "/api/config") body = { modelReady: false };
     else if (path === "/api/charts" && init.method === "PUT") {
       const { chart, expected } = JSON.parse(init.body);
@@ -96,6 +97,8 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
     await pause();
   };
   assert.match(q("#connection").textContent, /尚待連線/);
+  await click("focusGoal");
+  assert.equal(w.document.activeElement?.id, "goalInput");
   q("#goalInput").value = "一年內能用日文獨立旅行";
   q("#homeDeadline").value = "一年內";
   q("#homeState").value = "初學者";
@@ -113,6 +116,7 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
   await click("applyCandidate");
   assert.equal(charts.length, 1);
   assert.equal(w.document.querySelectorAll(".grid>.cell").length, 9);
+  assert.match(q(".structure-progress").textContent, /已確認 0 \/ 8/);
   assert.equal(q('[data-action="worlds"]').disabled, true);
   await click("selectPillar");
   q("#pillarDeadline").value = "兩個月";
@@ -128,6 +132,7 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
   await click("applyCandidate");
   assert.equal(charts[0].expansions[0].length, 8);
   assert.equal(charts[0].pillarContexts[0].deadline, "兩個月");
+  assert.equal(w.document.querySelectorAll(".structure-pillars .raised").length, 1);
   await click("toggleDone");
   assert.equal(charts[0].doneActions["0:0"], true);
   await click("editAtom");
@@ -146,6 +151,7 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
   await pause();
   assert.deepEqual(charts[0].stale, [0]);
   assert.match(q(".stale-warning").textContent, /修改/);
+  assert.match(q(".structure-progress").textContent, /已確認 0 \/ 8/);
   await click("export");
   assert.equal(
     w.document.querySelectorAll(".export-preview svg rect").length,
@@ -164,6 +170,20 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
   assert.equal(w.document.querySelectorAll(".saved-card").length, 1);
   await click("demo");
   assert.equal(charts.length, 2);
+  await click("wholeBoard");
+  assert.equal(w.document.querySelectorAll(".whole-group > *").length, 81);
+  assert.equal(q('[data-action="wholeBoard"]').getAttribute("aria-expanded"), "true");
+  await click("wholeBoard");
+  for (const [index, column] of [[0, "2"], [2, "0"]]) {
+    q(`[data-action="selectPillar"][data-index="${index}"]`).click();
+    await pause();
+    assert.equal(q(".overview-dock").dataset.column, column);
+    assert.equal(q(".overview-dock").dataset.row, "2");
+    assert.equal(w.document.querySelectorAll(".branch-board .grid > .cell").length, 9);
+    await click("collapse");
+    assert.equal(w.document.activeElement?.getAttribute("data-index"), String(index));
+  }
+  assert.match(q(".structure-progress").textContent, /已確認 8 \/ 8/);
   assert.equal(q('[data-action="worlds"]').disabled, false);
   await click("worlds");
   assert.match(q(".world-frame").src, /\/worlds\//);

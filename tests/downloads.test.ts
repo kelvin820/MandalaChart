@@ -115,7 +115,8 @@ test("PDF 為可解析的實際 A3 PDF，並內嵌可編輯 JSON 附件", async 
   assert.equal(new TextDecoder().decode(bytes.slice(0, 5)), "%PDF-");
   const pdf = await PDFDocument.load(bytes);
   assert.equal(pdf.getPageCount(), 1);
-  assert.ok(Math.abs(pdf.getPage(0).getWidth() - 841.89) < 1);
+  assert.ok(Math.abs(pdf.getPage(0).getWidth() - 1190.55) < 1);
+  assert.ok(Math.abs(pdf.getPage(0).getHeight() - 841.89) < 1);
   assert.ok(pdf.catalog.has((await import("pdf-lib")).PDFName.of("Names")));
 });
 test("產生、儲存、下載 PDF，版本更新後不覆蓋舊匯出", async () => {
@@ -211,4 +212,5 @@ test("SVG 匯出不截斷長目標，並跳脫文字中的 XML", () => {
   assert.equal((svg.match(/目/g) || []).length >= 98, true);
   assert.match(svg, /&lt;&gt;&amp;&quot;/);
   assert.doesNotMatch(svg, /<script>/);
+  assert.equal((svg.match(/fill="url\(#pillar-direction\)"/g) || []).length, 8);
 });

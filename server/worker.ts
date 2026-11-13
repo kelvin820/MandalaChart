@@ -35,7 +35,10 @@ export default {
       assets[path === "/" ? "/index.html" : path] ??
       (path === "/worlds/" ? assets["/worlds/index.html"] : null);
     if (!file) return new Response("Not found", { status: 404 });
-    return new Response(file.body, {
+    const body = file.base64
+      ? Uint8Array.from(atob(file.body), (byte) => byte.charCodeAt(0))
+      : file.body;
+    return new Response(body, {
       headers: {
         "Content-Type": file.type,
         "Cache-Control": "no-cache",

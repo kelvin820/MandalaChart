@@ -11,15 +11,23 @@
       content="從一個終極目標，找到八個支柱與可以開始的原子行動。"
     />
     <title>目標之境｜曼陀羅目標教練</title>
+    <meta name="theme-color" content="#111119" />
+    <link rel="stylesheet" href="/theme.css" />
     <link rel="stylesheet" href="/style.css" />
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/svg+xml" href="/brand/mandala.svg" />
   </head>
   <body>
     <header class="site-header">
-      <a href="/" class="brand"
-        ><span class="brand-symbol">✳</span
-        ><span>目標之境<small>MANDALA STUDIO</small></span></a
-      >
+      <a href="/" class="brand">
+        <img
+          class="brand-logo"
+          src="/brand/mandala.svg"
+          width="48"
+          height="48"
+          alt=""
+        />
+        <span>目標之境<small>MANDALA STUDIO</small></span>
+      </a>
       <div class="header-right">
         <span id="connection">正在連線…</span
         ><button data-action="home" class="quiet">我的曼陀羅表</button>
@@ -27,11 +35,25 @@
     </header>
     <main id="app"></main>
     <footer class="site-footer">
-      <span>一個目標。八個支柱。從今天能做的一步開始。</span
-      ><span>MANDALA STUDIO · 2026</span>
+      <button type="button" class="creator-credit" aria-haspopup="dialog" aria-controls="creatorDialog" aria-label="放大 CHANG KAI MAU 個人標誌">
+        <img src="/brand/chang-kai-mau.svg" width="32" height="32" alt="" />
+        <span>設計與開發 · CHANG KAI MAU</span>
+      </button>
+      <span>MANDALA STUDIO · 2026</span>
     </footer>
     <div id="toast" role="status" aria-live="polite"></div>
     <dialog id="dialog"><div id="dialogContent"></div></dialog>
+    <dialog id="creatorDialog" aria-labelledby="creatorTitle">
+      <div class="creator-preview">
+        <form method="dialog">
+          <button type="submit" aria-label="關閉個人標誌" autofocus>×</button>
+        </form>
+        <img src="/brand/chang-kai-mau.svg" width="220" height="220" alt="CHANG KAI MAU 個人標誌" />
+        <h2 id="creatorTitle">CHANG KAI MAU</h2>
+      </div>
+    </dialog>
+    <script type="module" src="/brand/creator.js"></script>
     <script type="module" src="/app.js"></script>
+    <script type="module" src="/hero-scene.js"></script>
   </body>
 </html>

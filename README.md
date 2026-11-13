@@ -4,7 +4,7 @@
 
 ## 本次設計
 
-- 暖白底、靛藍主色、琥珀選取提示；不使用綠色底。
+- 全站採用深色底、霧藍標題與香檳金進度提示。標題使用本機提供的 Noto Serif TC 字型子集，其他字元由系統字型補齊。
 - 先分析與填表，完成八個支柱的展開與檢查後才開啟 3D。
 - 保留舊版的範例、清單、兩層九宮格、單格替換、手動編輯與檢核。
 - 加入支柱局部的期限、起點、限制；生成前可修改 System/User Prompt。
@@ -16,7 +16,7 @@
 
 ## 實作選擇
 
-採用 TypeScript、原生 DOM 元件、Zod、Vercel AI SDK 的 OpenAI provider、SQLite 相容儲存。前一版為 buildless 靜態網站；這次保留輕量前端與既有 Canvas 立體渲染器，以獨立模組取代原平台私有 SDK，避免直接搬入單一大型 App.tsx。舊交接文件指定的框架與逐字 Prompt 不是本次硬性需求。
+採用 TypeScript、原生 DOM 元件、Zod、Vercel AI SDK 的 OpenAI provider、SQLite 相容儲存與 Three.js。首頁與 3D 成果共用渲染模組，編輯區的支柱進度由已確認的資料驅動。
 
 - `src/domain.ts`：資料 schema、兩層 Prompt、候選採用規則。
 - `src/app.ts`：首頁、九宮格、編輯、Prompt、比較採用、備份。
@@ -26,7 +26,7 @@
 - `server/worker.ts`：Sites Cloudflare Worker，靜態資源隨 Worker 內嵌。
 - `server/local.ts`：僅監聽 127.0.0.1 的本機 Node SQLite 版本。
 - `db/schema.ts` / `drizzle/`：Drizzle 產生的資料庫遷移。
-- `public/worlds/`：四種旋轉、縮放與生成動畫，接收目前填好的表，僅供檢視。
+- `src/scenes/`：Three.js 場景，支援旋轉、縮放、選取支柱、重播生成及平面曼陀羅視圖。3D 頁的行動勾選與原表同步，核心水晶亮度反映全表完成數。3D 成果需要 WebGL 2，無法顯示時仍可勾選行動。
 
 ## 本機啟動
 

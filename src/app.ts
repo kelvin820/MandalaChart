@@ -1,4 +1,4 @@
-import { svgChart } from "./export.ts";
+import { sheetHeight, sheetWidth, svgChart } from "./export.ts";
 import {
   chartSchema,
   contextSchema,
@@ -77,8 +77,8 @@ async function load() {
     ready = config.modelReady;
     charts = list.charts;
     $("#connection").textContent = ready
-      ? "AI 已設定 · 雲端儲存"
-      : "AI 尚待連線 · 雲端儲存";
+      ? "AI 已設定"
+      : "AI 尚待連線";
     loadError = "";
   } catch (e) {
     loadError = (e as Error).message;
@@ -104,7 +104,7 @@ function readContext(prefix: string): Context {
   });
 }
 function renderHome() {
-  app.innerHTML = `<section class="hero"><div><div class="eyebrow">MAKE ROOM FOR WHAT MATTERS.</div><h1>想去的地方，<br><em>從一步開始。</em></h1><p>把一個終極目標，拆成八個支持它的支柱。<br>讓 AI 和你一起，找到現在就能開始的行動與能力。</p></div><div class="hero-art" aria-hidden="true">${["能力", "習慣", "資源", "環境", "目標", "行動", "練習", "回饋", "累積"].map((t) => `<div>${t}</div>`).join("")}</div></section>${loadError ? `<div class="error-banner" role="alert">${escape(loadError)} <button data-action="reload">重新連線</button></div>` : ""}<div class="home-layout"><section class="panel"><div class="panel-heading"><h2>你的終極目標</h2><span class="step">01 / DEFINE</span></div><form id="createForm"><label class="field"><span class="label">你想實現什麼？</span><textarea id="goalInput" class="goal-input" maxlength="200" required placeholder="例如：一年後，能自信地用英文完成工作簡報">${escape(draft.goal)}</textarea><span class="char-count">不必一次想完整，先寫下你想去的方向。</span></label><div class="examples">${examples.map((s, i) => `<button type="button" data-action="example" data-index="${i}">${escape(s)}</button>`).join("")}</div><details class="context"><summary>＋ 加上期限、起點與限制，讓拆解更貼近你</summary>${contextFields("home", draft)}</details><div class="submit-row"><button class="primary" type="submit" ${loadError ? "disabled" : ""}>一起拆解目標　↗</button><small>生成前可檢視<br>與修改 Prompt</small></div></form></section><aside class="home-side"><div class="eyebrow">A THOUGHTFUL WAY FORWARD</div><div class="steps">${[
+  app.innerHTML = `<section class="hero"><div class="hero-copy"><h1>把想去的地方，<br><em>一步步建起來。</em></h1><p>寫下一個讓你想出發的目標。從八個支柱，找到今天就能做的一件事。</p><div class="hero-actions"><button data-action="focusGoal">開始寫下目標 <span aria-hidden="true">↓</span></button><button data-action="demo" class="hero-demo" ${loadError ? "disabled" : ""}>看看範例 <span aria-hidden="true">↗</span></button></div></div><mandala-preview class="hero-art" aria-hidden="true"></mandala-preview></section>${loadError ? `<div class="error-banner" role="alert">${escape(loadError)} <button data-action="reload">重新連線</button></div>` : ""}<div class="home-layout"><section class="panel"><div class="panel-heading"><h2>你的終極目標</h2><span class="step">01 / DEFINE</span></div><form id="createForm"><label class="field"><span class="label">你想實現什麼？</span><textarea id="goalInput" class="goal-input" maxlength="200" required placeholder="例如：一年後，能自信地用英文完成工作簡報">${escape(draft.goal)}</textarea><span class="char-count">不必一次想完整，先寫下你想去的方向。</span></label><div class="examples">${examples.map((s, i) => `<button type="button" data-action="example" data-index="${i}">${escape(s)}</button>`).join("")}</div><details class="context"><summary>＋ 加上期限、起點與限制，讓拆解更貼近你</summary>${contextFields("home", draft)}</details><div class="submit-row"><button class="primary" type="submit" ${loadError ? "disabled" : ""}>一起拆解目標　↗</button><small>生成前可檢視<br>與修改 Prompt</small></div></form></section><aside class="home-side"><div class="eyebrow">A THOUGHTFUL WAY FORWARD</div><div class="steps">${[
     ["先說清楚想要什麼", "目標、起點與限制，都是拆解的依據。"],
     ["找到支持它的八個支柱", "能力、習慣、資源，都可以是一塊拼圖。"],
     ["拆成真正能開始的一步", "逐格展開，調整到適合自己的大小。"],
@@ -147,6 +147,18 @@ function progress(c: Chart) {
     done: Object.values(c.doneActions).filter(Boolean).length,
   };
 }
+let previousStructure: { id: string; confirmed: boolean[] } | undefined;
+function structureProgress(chart: Chart) {
+  const confirmed = chart.subGoals.map((_, index) =>
+    !!chart.expansions[index] && !chart.stale.includes(index),
+  );
+  const previous = previousStructure?.id === chart.id ? previousStructure.confirmed : confirmed;
+  previousStructure = { id: chart.id, confirmed };
+  const pillars = confirmed.map((ready, index) =>
+    `<i class="${ready ? "ready" : ""} ${ready && !previous[index] ? "raised" : ""}"></i>`,
+  );
+  return `<div class="structure-progress"><div class="structure-pillars" aria-hidden="true">${pillars.join("")}</div><p>已確認 ${confirmed.filter(Boolean).length} / 8 個支柱</p></div>`;
+}
 function renderChart() {
   const c = current!,
     p = progress(c);
@@ -159,15 +171,47 @@ function renderChart() {
       .filter((s) => s[1])
       .map((s) => `<span>${s[0]}：${escape(s[1])}</span>`)
       .join("") || "<span>尚未設定定位資訊，可隨時編輯目標補充。</span>"
-  }</div></div><div class="chart-progress"><div>支柱展開 ${p.expanded}/8　·　行動檢核 ${p.done}/${p.total}</div><div class="progress-track"><i style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></i></div></div></div>${c.stale.length ? '<div class="stale-warning">上層目標或支柱已修改，部分行動需要重新檢查。舊內容仍保留，確認適用或重新生成後即可更新。</div>' : ""}<div class="chart-layout"><section><div class="grid" aria-label="第一層曼陀羅九宮格">${POS.map((i) => (i === -1 ? `<div class="cell center"><small>終極目標</small><strong>${escape(c.goal)}</strong></div>` : `<button class="cell ${selected === i ? "selected" : ""}" data-action="selectPillar" data-index="${i}" aria-pressed="${selected === i}"><span class="cell-number">PILLAR 0${i + 1}</span><strong>${escape(c.subGoals[i].title)}</strong><p>${escape(c.subGoals[i].actionHint)}</p><small>${c.expansions[i] ? `${c.stale.includes(i) ? "待檢查 · " : ""}已展開 · ${Object.keys(c.doneActions).filter((k) => k.startsWith(i + ":") && c.doneActions[k]).length}/8 已檢核` : "點選，補充條件與展開 ↗"}</small></button>`)).join("")}</div><p class="section-caption">點選一個支柱，找出支持它的八項原子行動或能力。</p></section><aside class="chart-aside"><h3>讓目標有根基。</h3><p>八個支柱是起點，不是唯一答案。你可以編輯、換個切入點，再慢慢拆到適合自己的大小。</p><div class="big-number">${String(p.expanded).padStart(2, "0")}<small> / 08 已展開</small></div><div class="divider"></div><button data-action="export">匯出曼陀羅表 ↗</button><button data-action="worlds" ${p.expanded < 8 || c.stale.length ? "disabled" : ""}>探索我的 3D 目標之境 ↗</button><p class="note" style="margin-top:12px">${p.expanded < 8 ? "完成八個支柱的拆解後，讓整張表長成立體模型。" : c.stale.length ? "先檢查更新後的行動，再檢視立體成果。" : "結構已建立。用四種視角，看見小行動如何支持目標。"}</p></aside></div><div id="branchArea"></div>`;
+  }</div></div><div class="chart-progress"><div>支柱展開 ${p.expanded}/8　·　行動檢核 ${p.done}/${p.total}</div><div class="progress-track"><i style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></i></div></div></div>${c.stale.length ? '<div class="stale-warning">上層目標或支柱已修改，部分行動需要重新檢查。舊內容仍保留，確認適用或重新生成後即可更新。</div>' : ""}<div class="chart-layout"><section>${selected !== null ? '<div id="branchArea"></div>' : wholeBoard ? renderWholeBoard(c) : overviewGrid(c)}</section><aside class="chart-aside"><h3>讓目標有根基。</h3><p>八個支柱是起點，不是唯一答案。你可以編輯、換個切入點，再慢慢拆到適合自己的大小。</p>${structureProgress(c)}<div class="divider"></div><button data-action="export">匯出曼陀羅表 ↗</button><button data-action="worlds" ${p.expanded < 8 || c.stale.length ? "disabled" : ""}>探索我的 3D 目標之境 ↗</button><p class="note" style="margin-top:12px">${p.expanded < 8 ? "完成八個支柱的拆解後，讓整張表長成立體模型。" : c.stale.length ? "先檢查更新後的行動，再檢視立體成果。" : "結構已建立。用四種視角，看見小行動如何支持目標。"}</p></aside></div>`;
   renderBranch();
 }
+let wholeBoard = false;
+
+function animateBoard(element: HTMLElement, from: DOMRect) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || !element.animate) return;
+  const to = element.getBoundingClientRect();
+  if (!from.width || !from.height || !to.width || !to.height) return;
+  element.animate(
+    [
+      { transformOrigin: "0 0", transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`, opacity: 0.38 },
+      { transformOrigin: "0 0", transform: "none", opacity: 1 },
+    ],
+    { duration: 280, easing: "cubic-bezier(.22,.8,.25,1)" },
+  );
+}
+
+function renderWholeBoard(chart: Chart) {
+  return `<div class="whole-board" aria-label="完整曼陀羅表">${POS.map((pillar) => {
+    const cells = POS.map((action) => {
+      if (pillar === -1 && action === -1) {
+        return `<button class="whole-goal" data-action="wholeBoard" aria-expanded="true"><strong>${escape(chart.goal)}</strong><small>收合 ↙</small></button>`;
+      }
+      if (pillar === -1 || action === -1) {
+        return `<strong class="whole-pillar">${escape(chart.subGoals[pillar === -1 ? action : pillar].title)}</strong>`;
+      }
+      const item = chart.expansions[pillar]?.[action];
+      const done = chart.doneActions[pillar + ":" + action];
+      return `<span class="${done ? "whole-done" : ""}">${done ? "✓ " : ""}${item ? escape(item.title) : "—"}</span>`;
+    });
+    return `<div class="whole-group${pillar === -1 ? " whole-core" : ""}">${cells.join("")}</div>`;
+  }).join("")}</div>`;
+}
+
+function overviewGrid(c: Chart) {
+  return `<div class="grid" aria-label="第一層曼陀羅九宮格">${POS.map((i) => (i === -1 ? `<button class="cell center" data-action="wholeBoard" aria-expanded="false"><small>終極目標</small><strong>${escape(c.goal)}</strong><small>展開完整表 ↗</small></button>` : `<button class="cell ${selected === i ? "selected" : ""}" data-action="selectPillar" data-index="${i}" aria-pressed="${selected === i}"><span class="cell-number">PILLAR 0${i + 1}</span><strong>${escape(c.subGoals[i].title)}</strong><p>${escape(c.subGoals[i].actionHint)}</p><small>${c.expansions[i] ? `${c.stale.includes(i) ? "待檢查 · " : ""}已展開 · ${Object.keys(c.doneActions).filter((k) => k.startsWith(i + ":") && c.doneActions[k]).length}/8 已檢核` : "點選，補充條件與展開 ↗"}</small></button>`)).join("")}</div><p class="section-caption">點選一個支柱，找出支持它的八項原子行動或能力。</p>`;
+}
 function renderBranch() {
+  if (selected === null) return;
   const el = $("#branchArea");
-  if (selected === null) {
-    el.innerHTML = "";
-    return;
-  }
   const c = current!,
     i = selected,
     p = c.subGoals[i],
@@ -177,7 +221,10 @@ function renderBranch() {
       currentState: "",
       constraints: "",
     };
-  el.innerHTML = `<section class="branch" id="branch"><div class="branch-head"><div><div class="eyebrow">PILLAR 0${i + 1} / BREAK IT DOWN</div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div><button data-action="collapse">收起 ↑</button></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">這一格換個方向</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}${atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? `<div class="cell center"><small>行動支柱</small><strong>${escape(p.title)}</strong></div>` : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-pressed="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div><div id="atomDetail"></div>` : '<div class="empty" style="margin-top:20px">補充你目前的條件，讓 AI 提出八個能開始的小步驟。<br>生成前可以修改 Prompt，生成後可以比較與編輯。</div>'}</section>`;
+  const anchor = 8 - POS.indexOf(i);
+  const grid = atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? `<div class="cell center"><small>行動支柱</small><strong>${escape(p.title)}</strong></div>` : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-pressed="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div>` : `<div class="grid" aria-label="尚未展開的行動九宮格">${POS.map((j) => j === -1 ? `<button class="cell center" data-action="expand"><small>PILLAR 0${i + 1}</small><strong>${escape(p.title)}</strong><small>展開八項行動 ↗</small></button>` : '<div class="cell empty-atom" aria-hidden="true"></div>').join("")}</div>`;
+  const mini = `<button class="overview-mini" data-action="collapse" aria-label="返回第一層曼陀羅九宮格"><span class="mini-grid" aria-hidden="true">${POS.map((j) => `<i class="${j === i ? "mini-active" : j === -1 ? "mini-center" : ""}"></i>`).join("")}</span><span>返回總覽</span></button>`;
+  el.innerHTML = `<section class="branch" id="branch"><div class="branch-board">${grid}<div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div></div>${atoms ? '<div id="atomDetail"></div>' : ""}<div class="branch-head"><div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">這一格換個方向</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}</section>`;
   if (atoms) renderAtom();
 }
 function renderAtom() {
@@ -214,6 +261,7 @@ async function saveChart(c: Chart, expected: number | null = c.revision) {
   }
 }
 function goHome() {
+  wholeBoard = false;
   if (current) {
     current = null;
     selected = null;
@@ -222,6 +270,7 @@ function goHome() {
   renderHome();
 }
 function openChart(id: string) {
+  wholeBoard = false;
   current = charts.find((c) => c.id === id) ?? null;
   selected = null;
   actionIndex = 0;
@@ -609,19 +658,21 @@ async function preparePdf(button: HTMLElement) {
   const result = $("#pdfResult");
   result.textContent = "正在保留中文字型與排版，請稍候…";
   try {
-    await document.fonts.ready;
+    const font = await fetch("/fonts/noto-serif-tc-ui.woff2");
+    if (!font.ok) throw Error("無法載入 PDF 字型，請重試。");
+    const bytes = new Uint8Array(await font.arrayBuffer());
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
     const image = new Image();
     image.src =
       "data:image/svg+xml;charset=utf-8," +
-      encodeURIComponent(svgChart(snapshot));
+      encodeURIComponent(svgChart(snapshot, btoa(binary)));
     await image.decode();
     const canvas = document.createElement("canvas");
-    canvas.width = 2072;
-    canvas.height = 2260;
+    canvas.width = sheetWidth * 2;
+    canvas.height = sheetHeight * 2;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw Error("瀏覽器無法產生圖片，請改用 SVG 下載。");
-    ctx.fillStyle = "#faf7f2";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
     const png = await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob(
@@ -660,6 +711,10 @@ function openExport() {
   );
 }
 function openWorlds() {
+  if (busy) {
+    toast("正在儲存行動進度，請稍候再開啟 3D。");
+    return;
+  }
   const c = current!;
   if (progress(c).expanded < 8 || c.stale.length) {
     toast("先完成八個支柱的拆解與檢查，再看立體成果。");
@@ -668,6 +723,7 @@ function openWorlds() {
   sessionStorage.setItem(
     "mandala-world-view",
     JSON.stringify({
+      chartId: c.id,
       goal: c.goal,
       pillars: c.subGoals.map((p, i) => ({
         name: p.title,
@@ -679,11 +735,38 @@ function openWorlds() {
   show(
     modal(
       "你的小行動，已經形成一個有方向的世界。",
-      '<p>四種模型共用你填寫的內容。這裡呈現支撐關係，不代表一定達成目標。</p><iframe title="我的四種立體曼陀羅模型" class="world-frame" src="/worlds/"></iframe>',
+      '<p>勾選做過的行動，讓核心水晶逐漸亮起。進度會同步儲存到這張表。</p><iframe title="我的四種立體曼陀羅模型" class="world-frame" src="/worlds/"></iframe>',
     ),
     "world-dialog",
   );
 }
+window.addEventListener("message", async (event) => {
+  const frame = dialog.querySelector<HTMLIFrameElement>(".world-frame");
+  const request = event.data;
+  const reply = event.ports[0];
+  if (!dialog.open || !frame || event.source !== frame.contentWindow ||
+      event.origin !== location.origin || request?.type !== "mandala:check-action" || !reply) return;
+  try {
+    const chart = current;
+    const { chartId, pillar, action, done } = request;
+    if (!chart || chart.id !== chartId || typeof done !== "boolean" ||
+        !Number.isInteger(pillar) || !Number.isInteger(action) ||
+        !chart.expansions[pillar]?.[action] || chart.stale.includes(pillar)) {
+      throw Error("這項行動已變更，請重新開啟 3D 檢視。");
+    }
+    const updated = structuredClone(chart);
+    const key = pillar + ":" + action;
+    if (done) updated.doneActions[key] = true;
+    else delete updated.doneActions[key];
+    await saveChart(updated);
+    if (current?.id === chart.id) renderChart();
+    reply.postMessage({ ok: true });
+  } catch (error) {
+    reply.postMessage({ ok: false, message: (error as Error).message || "儲存未完成，請再試一次。" });
+  } finally {
+    reply.close();
+  }
+});
 function migrateImported(raw: any): Chart {
   const m = structuredClone(raw);
   m.id =
@@ -724,6 +807,10 @@ function validateImportedCharts(raw: any) {
 }
 let deleting = false;
 async function act(action: string, button: HTMLElement) {
+  if (action === "focusGoal") {
+    $("#goalInput").focus();
+    return;
+  }
   if (action === "close") {
     if (pending && !sessionStorage.getItem("mandala-pending")) {
       pending = null;
@@ -762,26 +849,38 @@ async function act(action: string, button: HTMLElement) {
     }
     return;
   }
+  if (action === "wholeBoard") {
+    wholeBoard = !wholeBoard;
+    renderChart();
+    $("[data-action=wholeBoard]").focus({ preventScroll: true });
+    return;
+  }
   if (action === "selectPillar") {
+    const from = $(".chart-layout .grid").getBoundingClientRect();
     selected = Number(button.dataset.index);
     actionIndex = 0;
     renderChart();
-    $("#branch").scrollIntoView({
-      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-      block: "start",
-    });
+    const mini = $(".overview-mini");
+    animateBoard(mini, from);
+    mini.focus({ preventScroll: true });
     return;
   }
   if (action === "collapse") {
+    const from = $(".overview-mini").getBoundingClientRect();
+    const index = selected;
     selected = null;
     renderChart();
+    animateBoard($(".chart-layout .grid"), from);
+    $(`[data-action="selectPillar"][data-index="${index}"]`).focus({ preventScroll: true });
     return;
   }
   if (action === "selectAtom") {
     actionIndex = Number(button.dataset.index);
-    renderBranch();
+    document.querySelectorAll<HTMLElement>("[data-action=selectAtom]").forEach((cell) => {
+      cell.classList.toggle("selected", cell === button);
+      cell.setAttribute("aria-pressed", String(cell === button));
+    });
+    renderAtom();
     return;
   }
   if (action === "editMeta") {
@@ -1032,6 +1131,9 @@ dialog.addEventListener("cancel", () => {
     pending = null;
     candidate = null;
   }
+});
+dialog.addEventListener("close", () => {
+  if (!dialog.open) dialog.querySelector(".world-frame")?.remove();
 });
 window.addEventListener("hashchange", () => {
   const id = location.hash.slice(1);
