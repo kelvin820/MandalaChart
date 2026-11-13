@@ -11,6 +11,7 @@ const cellHeight = 76;
 const left = 36;
 const top = 105;
 const groupGap = 6;
+export const boardViewBox = `0 0 ${cellWidth * 9 + groupGap * 2} ${cellHeight * 9 + groupGap * 2}`;
 
 const escape = (value: string) =>
   value.replace(
@@ -28,7 +29,7 @@ function position(col: number, row: number) {
   ];
 }
 
-function arrows() {
+export function pillarArrows(gradientId: string, offsetX = 0, offsetY = 0) {
   return branches
     .map(({ col, row }) => {
       const [sx, sy] = position(3 + col, 3 + row);
@@ -43,10 +44,10 @@ function arrows() {
         cellWidth / (2 * Math.abs(ux)),
         cellHeight / (2 * Math.abs(uy)),
       );
-      const x = sx + cellWidth / 2 + ux * (edge - 6);
-      const y = sy + cellHeight / 2 + uy * (edge - 6);
+      const x = sx - left + offsetX + cellWidth / 2 + ux * (edge - 6);
+      const y = sy - top + offsetY + cellHeight / 2 + uy * (edge - 6);
       const span = length - 2 * edge + 3;
-      return `<path transform="translate(${x} ${y}) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI})" d="M0 -6 L${span - 16} -6 L${span - 16} -13 L${span} 0 L${span - 16} 13 L${span - 16} 6 H0Z" fill="url(#pillar-direction)"/>`;
+      return `<path transform="translate(${x} ${y}) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI})" d="M0 -6 L${span - 16} -6 L${span - 16} -13 L${span} 0 L${span - 16} 13 L${span - 16} 6 H0Z" fill="url(#${gradientId})"/>`;
     })
     .join("");
 }
@@ -144,7 +145,7 @@ export function svgChart(chart: Chart, fontBase64?: string) {
     <text x="36" y="56" font-size="34" font-weight="800" fill="#203856">我的曼陀羅表</text>
     <text x="1182" y="53" text-anchor="end" font-size="12" letter-spacing="2.1" fill="#53627a">WISHLANDS</text>
     <path d="M36 77H1182" stroke="#a6916e"/>
-    ${backgrounds.join("")}${frames}${arrows()}${labels.join("")}
+    ${backgrounds.join("")}${frames}${pillarArrows("pillar-direction", left, top)}${labels.join("")}
     <text x="36" y="836" font-size="13" fill="#4f5c70">中心目標 → 八個支柱 → 六十四項行動</text>
     <text x="1182" y="836" text-anchor="end" font-size="13" fill="#4f5c70">已檢核 ${Object.values(chart.doneActions).filter(Boolean).length} / 64</text>
   </svg>`;

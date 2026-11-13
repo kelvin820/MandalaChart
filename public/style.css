@@ -1,5 +1,8 @@
 :root {
   --radius: 16px;
+  --core-ink: #fff1d6;
+  --core-border: #d5b075;
+  --core-surface: linear-gradient(150deg, #333a54, #252a40 78%);
 }
 * {
   box-sizing: border-box;
@@ -569,6 +572,7 @@ details.context .context-fields {
   margin-bottom: 22px;
 }
 .chart-heading h1 {
+  color: var(--core-ink);
   font-size: 29px;
   margin: 0 0 12px;
   max-width: 700px;
@@ -673,6 +677,22 @@ details.context .context-fields {
 .cell.center strong {
   font-size: 20px;
 }
+.cell.center.core-goal {
+  background: var(--core-surface);
+  border-color: var(--core-border);
+  color: var(--core-ink);
+}
+.cell.center.core-goal strong {
+  font-weight: 750;
+}
+.cell.center[data-action="collapse"]:hover,
+.cell.center.core-goal:hover {
+  background: #384768;
+}
+.cell.center .center-return {
+  color: #e0e9ff;
+  letter-spacing: 0;
+}
 .cell.completed strong {
   text-decoration: line-through;
   color: #cbc0a7;
@@ -768,9 +788,20 @@ details.context .context-fields {
 .whole-group {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
 }
 .whole-board {
+  position: relative;
+  isolation: isolate;
   gap: 5px;
+}
+.whole-arrows {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 .whole-group {
   gap: 1px;
@@ -801,10 +832,21 @@ details.context .context-fields {
   color: var(--amber);
   background: var(--amber-soft);
 }
+.whole-group > div > :is(strong, span),
 .whole-group .whole-goal {
-  color: var(--ink);
-  background: var(--navy);
-  border-color: var(--heading);
+  position: relative;
+  z-index: 2;
+}
+.whole-group .whole-goal {
+  color: var(--core-ink);
+  background: var(--core-surface);
+  border-color: var(--core-border);
+}
+.whole-group .whole-goal:hover {
+  background: #384768;
+}
+.whole-goal strong {
+  font-weight: 750;
 }
 .whole-goal small {
   color: var(--amber);

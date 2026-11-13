@@ -1,4 +1,4 @@
-import { sheetHeight, sheetWidth, svgChart } from "./export.ts";
+import { boardViewBox, pillarArrows, sheetHeight, sheetWidth, svgChart } from "./export.ts";
 import {
   chartSchema,
   contextSchema,
@@ -190,24 +190,24 @@ function animateBoard(element: HTMLElement, from: DOMRect) {
 }
 
 function renderWholeBoard(chart: Chart) {
-  return `<div class="whole-board" aria-label="完整曼陀羅表">${POS.map((pillar) => {
+  return `<div class="whole-board" aria-label="完整曼陀羅表"><svg class="whole-arrows" viewBox="${boardViewBox}" preserveAspectRatio="none" aria-hidden="true" focusable="false"><defs><linearGradient id="whole-pillar-direction"><stop stop-color="#8aafd5" stop-opacity="0"/><stop offset=".6" stop-color="#8aafd5" stop-opacity=".24"/><stop offset="1" stop-color="#a8ccff" stop-opacity=".57"/></linearGradient></defs>${pillarArrows("whole-pillar-direction")}</svg>${POS.map((pillar) => {
     const cells = POS.map((action) => {
       if (pillar === -1 && action === -1) {
-        return `<button class="whole-goal" data-action="wholeBoard" aria-expanded="true"><strong>${escape(chart.goal)}</strong><small>收合 ↙</small></button>`;
+        return `<button class="whole-goal core-goal" data-action="wholeBoard" aria-expanded="true"><strong>${escape(chart.goal)}</strong><small>收合 ↙</small></button>`;
       }
       if (pillar === -1 || action === -1) {
-        return `<strong class="whole-pillar">${escape(chart.subGoals[pillar === -1 ? action : pillar].title)}</strong>`;
+        return `<div class="whole-pillar"><strong>${escape(chart.subGoals[pillar === -1 ? action : pillar].title)}</strong></div>`;
       }
       const item = chart.expansions[pillar]?.[action];
       const done = chart.doneActions[pillar + ":" + action];
-      return `<span class="${done ? "whole-done" : ""}">${done ? "✓ " : ""}${item ? escape(item.title) : "—"}</span>`;
+      return `<div class="${done ? "whole-done" : ""}"><span>${done ? "✓ " : ""}${item ? escape(item.title) : "—"}</span></div>`;
     });
     return `<div class="whole-group${pillar === -1 ? " whole-core" : ""}">${cells.join("")}</div>`;
   }).join("")}</div>`;
 }
 
 function overviewGrid(c: Chart) {
-  return `<div class="grid" aria-label="第一層曼陀羅九宮格">${POS.map((i) => (i === -1 ? `<button class="cell center" data-action="wholeBoard" aria-expanded="false"><small>終極目標</small><strong>${escape(c.goal)}</strong><small>展開完整表 ↗</small></button>` : `<button class="cell ${selected === i ? "selected" : ""}" data-action="selectPillar" data-index="${i}" aria-pressed="${selected === i}"><span class="cell-number">PILLAR 0${i + 1}</span><strong>${escape(c.subGoals[i].title)}</strong><p>${escape(c.subGoals[i].actionHint)}</p><small>${c.expansions[i] ? `${c.stale.includes(i) ? "待檢查 · " : ""}已展開 · ${Object.keys(c.doneActions).filter((k) => k.startsWith(i + ":") && c.doneActions[k]).length}/8 已檢核` : "點選，補充條件與展開 ↗"}</small></button>`)).join("")}</div><p class="section-caption">點選一個支柱，找出支持它的八項原子行動或能力。</p>`;
+  return `<div class="grid" aria-label="第一層曼陀羅九宮格">${POS.map((i) => (i === -1 ? `<button class="cell center core-goal" data-action="wholeBoard" aria-expanded="false"><small>終極目標</small><strong>${escape(c.goal)}</strong><small>展開完整表 ↗</small></button>` : `<button class="cell ${selected === i ? "selected" : ""}" data-action="selectPillar" data-index="${i}" aria-pressed="${selected === i}"><span class="cell-number">PILLAR 0${i + 1}</span><strong>${escape(c.subGoals[i].title)}</strong><p>${escape(c.subGoals[i].actionHint)}</p><small>${c.expansions[i] ? `${c.stale.includes(i) ? "待檢查 · " : ""}已展開 · ${Object.keys(c.doneActions).filter((k) => k.startsWith(i + ":") && c.doneActions[k]).length}/8 已檢核` : "點選，補充條件與展開 ↗"}</small></button>`)).join("")}</div><p class="section-caption">點選一個支柱，找出支持它的八項原子行動或能力。</p>`;
 }
 function renderBranch() {
   if (selected === null) return;
@@ -222,7 +222,10 @@ function renderBranch() {
       constraints: "",
     };
   const anchor = 8 - POS.indexOf(i);
-  const grid = atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? `<div class="cell center"><small>行動支柱</small><strong>${escape(p.title)}</strong></div>` : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-pressed="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div>` : `<div class="grid" aria-label="尚未展開的行動九宮格">${POS.map((j) => j === -1 ? `<button class="cell center" data-action="expand"><small>PILLAR 0${i + 1}</small><strong>${escape(p.title)}</strong><small>展開八項行動 ↗</small></button>` : '<div class="cell empty-atom" aria-hidden="true"></div>').join("")}</div>`;
+  const center = atoms
+    ? `<button type="button" class="cell center" data-action="collapse"><small>行動支柱</small><strong>${escape(p.title)}</strong><small class="center-return">← 返回終極目標</small></button>`
+    : `<button type="button" class="cell center" data-action="expand"><small>PILLAR 0${i + 1}</small><strong>${escape(p.title)}</strong><small>展開八項行動 ↗</small></button>`;
+  const grid = atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? center : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-pressed="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div>` : `<div class="grid" aria-label="尚未展開的行動九宮格">${POS.map((j) => j === -1 ? center : '<div class="cell empty-atom" aria-hidden="true"></div>').join("")}</div>`;
   const mini = `<button class="overview-mini" data-action="collapse" aria-label="返回第一層曼陀羅九宮格"><span class="mini-grid" aria-hidden="true">${POS.map((j) => `<i class="${j === i ? "mini-active" : j === -1 ? "mini-center" : ""}"></i>`).join("")}</span><span>返回總覽</span></button>`;
   el.innerHTML = `<section class="branch" id="branch"><div class="branch-board">${grid}<div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div></div>${atoms ? '<div id="atomDetail"></div>' : ""}<div class="branch-head"><div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">這一格換個方向</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}</section>`;
   if (atoms) renderAtom();
