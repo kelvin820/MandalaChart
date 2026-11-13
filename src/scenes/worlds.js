@@ -184,7 +184,7 @@ const pillarButtons = data.pillars.map((pillar, index) => {
 });
 $("#pillars").replaceChildren(...pillarButtons);
 
-const labels = [...data.pillars.map((pillar) => pillar.name), "中央火炬"].map(
+const labels = [...data.pillars.map((pillar) => pillar.name), "CORE 目標"].map(
   (name, index) => {
     const label = document.createElement("button");
     label.type = "button";
@@ -397,6 +397,13 @@ $("#daylight").addEventListener("click", (event) => {
   stage?.setTime(button.dataset.time);
 });
 $("#islandOverview").onclick = () => stage?.focusIsland(-1);
+$("#toggleGoals").onclick = (event) => {
+  const list = $("#goalList");
+  list.hidden = !list.hidden;
+  $(".workspace").classList.toggle("goals-hidden", list.hidden);
+  event.currentTarget.textContent = list.hidden ? "顯示清單" : "收起清單";
+  event.currentTarget.setAttribute("aria-expanded", String(!list.hidden));
+};
 $("#toggleLabels").onclick = (event) => {
   showLabels = !showLabels;
   hoveredIsland = -1;

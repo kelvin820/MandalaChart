@@ -22,15 +22,21 @@ export const workshops = [
   ["金合歡壓製場", "木質燃料磚", "塊"],
   ["海上鑽油平台", "原油", "桶"],
 ];
-const layouts = [
-  [4.66, 1.46, 1.3, 9],
-  [4.98, 1.72, 1.1, 11],
-  [5.08, 1.9, 1.4, 5],
-  [5.2, 1.49, 1.59, 4],
-  [4.96, 1.7, 1.32, 6],
-  [4.47, 1.17, 1.05, 12],
-  [4.91, 1.42, 1.46, 7],
-  [4.65, 1.34, 1.18, 4],
+const hexRadius = 1.82;
+const hexStep = 3.38;
+const axial = [
+  [1, 0],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [0, -1],
+  [1, -1],
+  [-1, 2],
+  [1, -2],
+];
+const uniforms = [
+  0xd88a58, 0x819fc2, 0x8c9d68, 0xc98eaa, 0xd9b66a, 0x69a29f, 0xa58dc0,
+  0xce786d,
 ];
 const tau = Math.PI * 2;
 const vec = (x, y, z) => new T.Vector3(x, y, z);
@@ -131,7 +137,7 @@ function tree(parent, point, kind, scale) {
   }
 }
 
-function island(parent, depth, color, width = depth, sides = 9) {
+function island(parent, depth, color, width = depth, sides = 6) {
   const coast = new T.CylinderGeometry(1, 0.89, 1, sides);
   if (sides === 4) coast.rotateY(Math.PI / 4).scale(Math.SQRT2, 1, Math.SQRT2);
   mesh(parent, coast, 0x544f50, vec(0, -0.18, 0), [depth, 0.3, width], true);
@@ -252,37 +258,6 @@ function fuel(parent, point, index) {
   const piece = log(parent, point, grove[index][1], 0.53);
   piece.rotation.y = Math.PI / 2;
   return piece;
-}
-
-function cart(parent, index) {
-  const wagon = new T.Group();
-  parent.add(wagon);
-  mesh(wagon, box, 0x9f754f, vec(0, 0.15, 0), [0.37, 0.09, 0.66]);
-  for (const x of [-0.19, 0.19]) {
-    mesh(wagon, box, 0x775748, vec(x, 0.23, 0), [0.038, 0.11, 0.67]);
-    for (const z of [-0.23, 0.23]) {
-      mesh(
-        wagon,
-        cylinder,
-        0x423b43,
-        vec(x, 0.095, z),
-        [0.099, 0.047, 0.099],
-      ).rotation.z = Math.PI / 2;
-    }
-  }
-  mesh(wagon, box, 0xc09568, vec(0, 0.23, 0.43), [0.048, 0.048, 0.3]);
-  const cargo = Array.from({ length: 8 }, (_, j) =>
-    fuel(
-      wagon,
-      vec(
-        ((j % 2) - 0.5) * 0.176,
-        0.29 + Math.floor(j / 6) * 0.17,
-        ((Math.floor(j / 2) % 3) - 1) * 0.192,
-      ),
-      index,
-    ),
-  );
-  return { wagon, cargo };
 }
 
 function workshop(parent, point, index) {
@@ -545,29 +520,55 @@ function landscape(root) {
   root.add(ripples);
   const distant = new T.Group();
   root.add(distant);
-  for (let i = 0; i < 13; i++) {
-    const angle = (i * tau) / 13 + 0.18;
-    const p = polar(12.6 + (i % 4) * 2.35, angle, -1.14);
-    const radius = 1.7 + (i % 5) * 0.44;
+  for (let i = 0; i < 18; i++) {
+    const angle = (i * tau) / 18 + 0.18;
+    const p = polar(14.4 + (i % 3) * 1.3, angle, -1.14);
+    const radius = 3.4 + (i % 5) * 0.44;
     mesh(distant, rock, i % 2 ? 0x657864 : 0x596f6b, p, [
       radius,
-      0.42,
-      radius * 0.77,
+      0.82,
+      radius * 0.93,
     ]);
     const hill = p.clone().addScaledVector(polar(1, angle), radius * 0.37);
-    const height = 0.74 + ((i * 7) % 11) * 0.21;
+    const height = 1.45 + ((i * 7) % 11) * 0.35;
     hill.y += height * 0.25;
     mesh(distant, rock, i % 3 ? 0x667d70 : 0x86928a, hill, [
       radius * 0.76,
       height,
       radius * 0.66,
     ]);
-    for (let j = 0; j < 5; j++) {
+    for (let j = 0; j < 7; j++) {
       const point = p
         .clone()
-        .add(polar(radius * (0.28 + j * 0.1), j * 2.4 + i, 0.22));
+        .add(polar(radius * (0.3 + j * 0.065), j * 2.4 + i, 0.58));
       tree(distant, point, i % 3 === 0 ? 1 : 0, 0.45 + ((j + i) % 3) * 0.14);
     }
+  }
+  const clouds = [];
+  const cloudMaterial = new T.MeshStandardMaterial({
+    color: 0xf6e7d7,
+    roughness: 1,
+    fog: false,
+  });
+  for (let i = 0; i < 8; i++) {
+    const cloud = new T.Group();
+    const anchor = polar(
+      13.2 + (i % 3) * 1.4,
+      (i * tau) / 8,
+      3.0 + (i % 3) * 0.65,
+    );
+    cloud.position.copy(anchor);
+    root.add(cloud);
+    for (let j = 0; j < 5; j++) {
+      mesh(
+        cloud,
+        sphere,
+        cloudMaterial,
+        vec((j - 2) * 0.52, Math.sin(j * 1.7) * 0.19, Math.cos(j) * 0.23),
+        [0.63, 0.34 + (j % 3) * 0.11, 0.49],
+      );
+    }
+    clouds.push({ cloud, anchor });
   }
   const waterColors = {
     dawn: 0x527f88,
@@ -575,23 +576,31 @@ function landscape(root) {
     dusk: 0x556989,
     night: 0x294662,
   };
-  return (time) => {
-    water.material.color.setHex(waterColors[time]);
-    const ripple = new T.Color(waterColors[time]).lerp(
-      new T.Color(0xc1e2d9),
-      0.16,
-    );
-    for (let i = 0; i < ripples.count; i++) ripples.setColorAt(i, ripple);
-    ripples.instanceColor.needsUpdate = true;
+  return {
+    setTime(time) {
+      water.material.color.setHex(waterColors[time]);
+      const ripple = new T.Color(waterColors[time]).lerp(
+        new T.Color(0xc1e2d9),
+        0.16,
+      );
+      for (let i = 0; i < ripples.count; i++) ripples.setColorAt(i, ripple);
+      ripples.instanceColor.needsUpdate = true;
+    },
+    drift(time) {
+      clouds.forEach(({ cloud, anchor }, i) => {
+        cloud.position.x = anchor.x + Math.sin(time * 0.18 + i) * 0.95;
+        cloud.position.z = anchor.z + Math.cos(time * 0.12 + i) * 0.5;
+      });
+    },
   };
 }
 
 export function makeTimberIslands(pillars, mist, onDelivery) {
   const root = new T.Group();
-  const setTime = landscape(root);
+  const scenery = landscape(root);
   const hub = new T.Group();
   root.add(hub);
-  island(hub, 1.85, 0x8a936b);
+  island(hub, hexRadius, 0x8a936b);
   const fire = hearth(hub, mist);
   const lanterns = [];
   for (let i = 0; i < 8; i++) {
@@ -614,11 +623,17 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
   const pickables = [hub];
   hub.userData.pillar = 8;
   pillars.forEach((pillar, i) => {
-    const a = (i * tau) / 8;
+    const [q, r] = axial[i];
+    const center = vec(
+      hexStep * (q + r / 2),
+      0,
+      ((hexStep * Math.sqrt(3)) / 2) * r,
+    );
+    const a = Math.atan2(center.z, center.x);
     const outward = polar(1, a);
     const lateral = vec(-outward.z, 0, outward.x);
-    const [distance, depth, width, sides] = layouts[i];
-    const center = polar(distance, a);
+    const depth = hexRadius;
+    const width = hexRadius;
     centers.push(center);
     const land = new T.Group();
     land.position.copy(center);
@@ -626,38 +641,52 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     root.add(land);
     pickables.push(land);
     const industrial = !woods[i];
-    const foundation = new T.Group();
-    foundation.rotation.y = -a;
-    land.add(foundation);
     const terrain = [
       0x6e8b69, 0x96a76e, 0x716576, 0xb0a072, 0xb89c73, 0x8a946f, 0xa39461,
+      0x657f8d,
     ][i];
+    island(land, depth, terrain);
     if (i === 7) {
-      mesh(
-        foundation,
-        box,
-        0x657f8d,
-        vec(0, -0.13, 0),
-        [depth * 2, 0.26, width * 2],
-        true,
-      );
-      for (const x of [-0.78, 0.78])
-        for (const z of [-0.7, 0.7]) {
-          mesh(
-            foundation,
-            cylinder,
-            0x496678,
-            vec(x, -0.68, z),
-            [0.1, 1.18, 0.1],
-          );
-          mesh(foundation, box, 0xf4bb68, vec(x, 0.04, z), [0.14, 0.08, 0.14]);
-        }
-      for (const z of [-0.94, 0.94]) {
-        mesh(foundation, box, 0xe6ab58, vec(0, 0.23, z), [1.97, 0.04, 0.047]);
-        for (const x of [-0.92, 0, 0.92])
-          mesh(foundation, box, 0xe6ab58, vec(x, 0.12, z), [0.045, 0.24, 0.05]);
+      for (let j = 0; j < 6; j++) {
+        mesh(
+          land,
+          cylinder,
+          0x496678,
+          polar(1.36, (j * tau) / 6, -0.66),
+          [0.11, 1.18, 0.11],
+        );
       }
-    } else island(foundation, depth, terrain, width, sides);
+    }
+    for (let j = 0; j < 6; j++) {
+      const angle = (j * tau) / 6;
+      mesh(
+        land,
+        box,
+        0xc7bca2,
+        polar(1.48, angle, 0.02),
+        [0.2, 0.035, 0.13],
+      ).rotation.y = -angle;
+      mesh(
+        land,
+        rock,
+        industrial ? 0x87828a : 0x76926d,
+        polar(1.37, angle + 0.19, 0.075),
+        [0.13, 0.13, 0.11],
+      );
+    }
+    for (let j = 0; j < 5; j++) {
+      const tile = outward
+        .clone()
+        .multiplyScalar(0.24 - j * 0.23)
+        .setY(0.025);
+      mesh(
+        land,
+        box,
+        j % 2 ? 0xb3a18b : 0xc8b69e,
+        tile,
+        [0.19, 0.036, 0.43],
+      ).rotation.y = -a;
+    }
     const machinery = workshop(
       land,
       outward
@@ -719,51 +748,53 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
         );
       }
     }
-    const home = center
-      .clone()
-      .addScaledVector(outward, 0.18)
-      .addScaledVector(lateral, 0.39);
-    const work = center
-      .clone()
-      .addScaledVector(outward, 0.14)
-      .addScaledVector(lateral, -0.27);
-    const ramp = center.clone().addScaledVector(outward, -depth * 0.86);
-    const entrance = polar(1.66, a);
-    const hearthside = polar(0.83, a);
+    const via = i >= 6 ? centers[i === 6 ? 2 : 5] : null;
+    const heading = (via ?? vec(0, 0, 0)).clone().sub(center).normalize();
+    const edge = hexRadius * Math.cos(Math.PI / 6);
+    const ramp = center.clone().addScaledVector(heading, edge - 0.12);
+    const entrance = via
+      ? via.clone().addScaledVector(heading, -edge + 0.12)
+      : heading.clone().multiplyScalar(-edge + 0.12);
     bridge(root, ramp, entrance);
-    const actor = courier(industrial ? 0xe0a34e : leaf, bark);
-    actor.root.scale.setScalar(1.22);
-    root.add(actor.root);
-    actor.root.position.copy(home);
-    actor.root.rotation.y = Math.atan2(-outward.x, -outward.z);
-    const team = [actor, courier(0xd6a374, bark), courier(0x879ac2, bark)];
-    team.slice(1).forEach((worker, j) => {
-      worker.root.position
-        .copy(home)
-        .addScaledVector(outward, 0.38 - j * 0.36)
-        .addScaledVector(lateral, j === 0 ? -0.73 : 0.38);
-      worker.root.rotation.y = Math.atan2(-outward.x, -outward.z);
-      worker.root.scale.setScalar(0.94);
-      root.add(worker.root);
+    const workers = pillar.checked.map((checked, j) => {
+      const actor = courier(uniforms[(i + j) % uniforms.length], bark);
+      actor.root.scale.setScalar(0.72);
+      actor.axe.visible = actor.bundle.visible = false;
+      const cargo = fuel(actor.upper, vec(0, 0.26, 0.23), i);
+      cargo.visible = false;
+      root.add(actor.root);
+      const home = center
+        .clone()
+        .addScaledVector(outward, -0.25 + (j % 4) * 0.29)
+        .addScaledVector(lateral, j < 4 ? -0.75 : 0.77);
+      actor.root.position.copy(home);
+      const lane = ((j % 2) - 0.5) * 0.15;
+      const offset = vec(-heading.z * lane, 0, heading.x * lane);
+      const path = [
+        home,
+        ramp.clone().add(offset),
+        entrance.clone().add(offset),
+      ];
+      if (via) {
+        const toHub = via.clone().normalize();
+        path.push(
+          via.clone().addScaledVector(toHub, -0.3),
+          via.clone().addScaledVector(toHub, -edge + 0.12),
+          toHub.multiplyScalar(edge - 0.12),
+        );
+      }
+      path.push(polar(0.87, a + lane));
+      return {
+        actor,
+        cargo,
+        home,
+        path,
+        elapsed: checked ? -0.2 - j * 0.64 : 0,
+        checked,
+        delivered: false,
+      };
     });
-    const { wagon, cargo } = cart(root, i);
-    wagon.visible = false;
-    routes.push({
-      actor,
-      team,
-      machinery,
-      wagon,
-      cargo,
-      home,
-      work,
-      ramp,
-      entrance,
-      hearthside,
-      amount: pillar.checked.filter(Boolean).length,
-      elapsed: -i * 0.58,
-      delivered: false,
-      launch: false,
-    });
+    routes.push({ workers, machinery });
     dots.push(
       pillar.checked.map((checked, j) =>
         mesh(
@@ -805,89 +836,57 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     actor.legs[1].rotation.x = -stride * 0.52;
   }
 
-  function rest(route) {
-    const { actor } = route;
-    actor.root.position.copy(route.home);
-    actor.root.rotation.y = Math.atan2(-route.home.x, -route.home.z);
-    actor.legs.forEach((leg) => {
+  function rest(worker) {
+    worker.actor.root.position.copy(worker.home);
+    worker.actor.upper.position.y = 0;
+    worker.actor.legs.forEach((leg) => {
       leg.rotation.x = 0;
     });
-    actor.arms.forEach((arm) => {
+    worker.actor.arms.forEach((arm) => {
       arm.rotation.x = 0;
     });
-    actor.upper.position.y = 0;
-    actor.axe.visible = actor.bundle.visible = false;
-    route.wagon.visible = false;
+    worker.cargo.visible = false;
   }
 
-  function advance(route, index, time, delta, motion) {
-    if (!motion) {
-      rest(route);
+  function advance(worker, index, delta, motion) {
+    if (!worker.checked || !motion) {
+      rest(worker);
       return;
     }
-    route.machinery?.(time + index * 0.47);
-    route.team.slice(1).forEach((worker, i) => {
-      const activity = Math.sin(time * 2.4 + index + i * 1.8);
-      worker.upper.position.y = Math.abs(activity) * 0.04;
-      worker.arms[i].rotation.x = -0.27 - activity * 0.55;
-      worker.root.rotation.y += Math.sin(time + i) * delta * 0.19;
+    worker.elapsed += delta;
+    if (worker.elapsed < 0) return;
+    const { actor, path } = worker;
+    const outbound = 3.9;
+    const cycle = 8.4;
+    const t = worker.elapsed;
+    if (t >= cycle) {
+      worker.elapsed = -0.7;
+      worker.delivered = false;
+      rest(worker);
+      return;
+    }
+    const carrying = t < outbound;
+    const progress = carrying
+      ? t / outbound
+      : Math.max(0, 1 - (t - outbound) / (cycle - outbound - 0.6));
+    const segment = progress * (path.length - 1);
+    const step = Math.min(path.length - 2, Math.floor(segment));
+    const fraction = segment - step;
+    const from = path[step];
+    const to = path[step + 1];
+    if (carrying) walk(worker, from, to, fraction, Math.sin(t * 14));
+    else walk(worker, to, from, 1 - fraction, Math.sin(t * 14));
+    worker.cargo.visible = carrying;
+    actor.arms.forEach((arm) => {
+      arm.rotation.x = carrying ? -1.05 : 0;
     });
-    if (!route.amount) {
-      rest(route);
-      return;
-    }
-    const previous = route.elapsed;
-    route.elapsed += delta;
-    const t = route.elapsed;
-    const { actor, home, work, ramp, entrance, hearthside, wagon, cargo } =
-      route;
-    if (t < 0) return;
-    const [, label, unit] = workshops[index];
-    if (previous < 0 && (index === selected || route.launch)) {
-      onDelivery?.("出發 · " + route.amount + unit + label);
-      route.launch = false;
-    }
-    const stride = Math.sin(t * 12);
-    actor.axe.visible = !!woods[index] && t > 0.42 && t < 1;
-    actor.arms[1].rotation.x = actor.axe.visible
-      ? -1.1 + Math.sin(t * 22) * 0.8
-      : 0;
-    if (t < 1) walk(route, home, work, Math.min(1, t / 0.55), stride);
-    else if (t < 1.75) walk(route, work, ramp, (t - 1) / 0.75, stride);
-    else if (t < 3.6) walk(route, ramp, entrance, (t - 1.75) / 1.85, stride);
-    else if (t < 4.2)
-      walk(route, entrance, hearthside, (t - 3.6) / 0.6, stride);
-    else if (t < 4.85)
-      walk(route, hearthside, entrance, (t - 4.2) / 0.65, stride);
-    else if (t < 6.4) walk(route, entrance, ramp, (t - 4.85) / 1.55, stride);
-    else if (t < 7.1) walk(route, ramp, home, (t - 6.4) / 0.7, stride);
-    else {
-      rest(route);
-      route.elapsed = -0.74 - index * 0.17;
-      route.delivered = false;
-      return;
-    }
-    wagon.visible = t >= 1;
-    wagon.position.copy(actor.root.position);
-    wagon.position.x -= Math.sin(actor.root.rotation.y) * 0.54;
-    wagon.position.z -= Math.cos(actor.root.rotation.y) * 0.54;
-    wagon.rotation.y = actor.root.rotation.y;
-    cargo.forEach((piece, i) => {
-      piece.visible = i < route.amount && t < 4.2;
-    });
-    if (!route.delivered && t >= 4.2) {
-      route.delivered = true;
-      fire.arrive(route.amount, index);
-      if (index === selected)
-        onDelivery?.(
-          "送達 · " +
-            route.amount +
-            unit +
-            label +
-            (route.amount === 8
-              ? "｜這座島的 8 項行動全數完成！"
-              : "｜又為目標添了一把火"),
-        );
+    if (!worker.delivered && !carrying) {
+      worker.delivered = true;
+      fire.arrive(1, index);
+      if (index === selected) {
+        const [, label, unit] = workshops[index];
+        onDelivery?.("送達 · 1" + unit + label);
+      }
     }
   }
 
@@ -900,30 +899,27 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       ...centers.map((point) => point.clone().setY(1.15)),
       vec(0, 1.3, 0),
     ],
-    setTime,
+    setTime: scenery.setTime,
     highlight,
     refresh(change, motion) {
       highlight(selected);
       fire.reset(count());
       if (!change) return;
-      const route = routes[change.pillar];
-      const amount = pillars[change.pillar].checked.filter(Boolean).length;
-      if (motion && !route.amount && amount) {
-        route.elapsed = -0.01;
-        route.delivered = false;
-        route.launch = true;
-      }
-      route.amount = amount;
-      if (!amount) {
-        rest(route);
-        route.elapsed = -0.01;
-        route.delivered = false;
-      }
+      const worker = routes[change.pillar].workers[change.action];
+      if (!worker) return;
+      worker.checked = pillars[change.pillar].checked[change.action];
+      worker.elapsed = -0.1;
+      worker.delivered = false;
+      if (!worker.checked || !motion) rest(worker);
     },
     tick(time, delta, light, motion) {
-      routes.forEach((route, index) =>
-        advance(route, index, time, delta, motion),
-      );
+      if (motion) scenery.drift(time);
+      routes.forEach((route, index) => {
+        if (motion) route.machinery?.(time + index * 0.47);
+        route.workers.forEach((worker) =>
+          advance(worker, index, delta, motion),
+        );
+      });
       fire.tick(time, delta, light, motion);
       lanterns.forEach((lamp) => {
         lamp.emissiveIntensity = light * 1.9;

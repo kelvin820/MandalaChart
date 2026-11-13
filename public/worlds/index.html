@@ -54,8 +54,18 @@
               </button>
             </div>
             <button type="button" id="islandOverview">回到全景</button>
-            <button type="button" id="toggleLabels" aria-pressed="true">島嶼名牌</button>
+            <button type="button" id="toggleLabels" aria-pressed="true">
+              島嶼名牌
+            </button>
           </div>
+          <button
+            type="button"
+            id="toggleGoals"
+            aria-controls="goalList"
+            aria-expanded="true"
+          >
+            收起清單
+          </button>
           <p id="delivery" class="delivery-status" role="status"></p>
           <p id="sceneUnavailable" role="status" hidden>
             這個瀏覽器目前無法顯示 3D。你仍可選取支柱，查看每項行動。
@@ -83,7 +93,7 @@
           </div>
           <div class="legend"><i></i> 金色標記代表已完成的行動</div>
         </section>
-        <aside>
+        <aside id="goalList" aria-label="目標清單">
           <div class="aside-top">
             <span>探索支柱</span><span id="pillarNumber">1 / 8</span>
           </div>

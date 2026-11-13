@@ -96,6 +96,24 @@ nav button[aria-pressed="true"] small {
   overflow: hidden;
   box-shadow: 0 14px 34px #08091085;
 }
+.workspace.goals-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+.workspace.goals-hidden .viewport {
+  min-height: max(530px, 78vh);
+}
+#toggleGoals {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  right: 12px;
+  color: #fff1d9;
+  background: #151e33ee;
+  font-size: 12px;
+}
+.goal-label {
+  margin-top: 28px;
+}
 .viewport {
   position: relative;
   min-height: 600px;
