@@ -1,0 +1,31 @@
+@font-face {
+  font-family: "Mandala Serif";
+  src: url("fonts/noto-serif-tc-ui.woff2") format("woff2");
+  font-weight: 500 800;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #111119;
+  --surface: #1a1b26;
+  --input: #151620;
+  --surface-raised: #232535;
+  --ink: #eeeaf0;
+  --heading: #b8caff;
+  --dim: #b0b1c3;
+  --border: #363848;
+  --border-active: #6879a5;
+  --navy: #2b3b66;
+  --navy-hover: #3a4c7c;
+  --blue-soft: #202a40;
+  --amber: #e4bd80;
+  --amber-soft: #382c20;
+  --danger: #ffacb9;
+  --danger-soft: #351f2c;
+  --danger-border: #764456;
+  --display-font:
+    "Mandala Serif", "Noto Serif TC", "Songti TC", "PMingLiU", Georgia, serif;
+  --body-font:
+    "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
+}

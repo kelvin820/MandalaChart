@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="讓願望有形，讓每一步都有方向。探索四種立體曼陀羅模型。"
+    />
+    <title>目標之境 · Mandala</title>
+    <meta name="theme-color" content="#111119" />
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="worlds/style.css" />
+    <link rel="icon" type="image/svg+xml" href="brand/mandala.svg" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <img
+          class="brand-logo"
+          src="brand/mandala.svg"
+          width="48"
+          height="48"
+          alt=""
+        />
+        <span>目標之境<small>MANDALA LAB</small></span>
+      </div>
+      <button id="export" hidden>↗ 匯出曼陀羅表</button>
+    </header>
+    <main>
+      <p id="sample" class="sample" hidden>範例目標 · 可試用行動勾選</p>
+      <nav id="modes" aria-label="模型選擇"></nav>
+      <div class="workspace">
+        <section class="viewport">
+          <div class="scene-title">
+            <h2 id="sceneName">八脊之山</h2>
+            <p id="sceneDescription"></p>
+          </div>
+          <canvas id="scene" aria-label="可拖曳旋轉的立體目標模型"></canvas>
+          <div id="islandLabels" hidden></div>
+          <div class="island-tools" hidden>
+            <div id="daylight" role="group" aria-label="島嶼時段">
+              <button type="button" data-time="dawn" aria-pressed="false">
+                清晨
+              </button>
+              <button type="button" data-time="day" aria-pressed="false">
+                白天
+              </button>
+              <button type="button" data-time="dusk" aria-pressed="false">
+                黃昏
+              </button>
+              <button type="button" data-time="night" aria-pressed="true">
+                夜晚
+              </button>
+            </div>
+            <button type="button" id="islandOverview">回到全景</button>
+            <button type="button" id="toggleLabels" aria-pressed="true">島嶼名牌</button>
+          </div>
+          <p id="delivery" class="delivery-status" role="status"></p>
+          <p id="sceneUnavailable" role="status" hidden>
+            這個瀏覽器目前無法顯示 3D。你仍可選取支柱，查看每項行動。
+          </p>
+          <div class="goal-label">
+            <span>核心目標</span>
+            <strong id="goal"></strong>
+            <div class="crystal-progress" aria-live="polite">
+              <span id="crystalCount"></span>
+              <progress
+                id="crystalProgress"
+                aria-label="全表行動完成進度"
+                max="64"
+                value="0"
+              ></progress>
+            </div>
+          </div>
+          <div class="scene-footer">
+            <span>拖曳旋轉 · 滾輪縮放 · 點選支柱</span>
+            <div>
+              <button id="rotate" aria-pressed="true">Ⅱ 暫停旋轉</button
+              ><button id="replay">↻ 重播生成</button
+              ><button id="flat" aria-pressed="false" hidden>▦ 平面視圖</button>
+            </div>
+          </div>
+          <div class="legend"><i></i> 金色標記代表已完成的行動</div>
+        </section>
+        <aside>
+          <div class="aside-top">
+            <span>探索支柱</span><span id="pillarNumber">1 / 8</span>
+          </div>
+          <div id="pillars" aria-label="八個支柱"></div>
+          <h3 id="pillarName"></h3>
+          <p id="islandWood" hidden></p>
+          <ol id="actions" aria-labelledby="pillarName"></ol>
+          <div class="aside-bottom">
+            <span id="chosen"></span
+            ><span id="checkStatus" role="status"></span>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <dialog id="exportDialog">
+      <div class="dialog-head">
+        <h2>你的曼陀羅表</h2>
+        <button id="closeDialog">關閉 ×</button>
+      </div>
+      <p>與四個立體模型共用相同內容，可下載 SVG 或列印為 PDF。</p>
+      <div id="chart"></div>
+      <div class="dialog-actions">
+        <button id="download">↓ 下載 SVG</button
+        ><button id="print">列印 / PDF</button>
+      </div>
+    </dialog>
+    <script type="module" src="worlds/app.js"></script>
+  </body>
+</html>
