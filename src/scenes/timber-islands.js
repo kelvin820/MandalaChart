@@ -139,6 +139,162 @@ function tree(parent, point, kind, scale) {
   }
 }
 
+const shorePalettes = [
+  [0x97a7a8, 0x577e8a, 0xdacfb1],
+  [0xcbb596, 0x8c6851, 0xe3d2ad],
+  [0x9a939d, 0x5b5369, 0xd9a853],
+  [0xc5ab83, 0xa4664b, 0xe0cb9c],
+  [0xb4ae9d, 0x597570, 0xe1b85f],
+  [0xd8b3aa, 0xa46a79, 0xf0d9bf],
+  [0xb3a5a0, 0x9c654f, 0xdcc29f],
+  [0x99abb6, 0x4d697e, 0xe3ad55],
+];
+
+function pavedSurface(parent, points, color, index) {
+  const [stone, , accent] = shorePalettes[index];
+  const industrial = !woods[index];
+  const tiles = [];
+  const pitch = 0.23;
+  const inside = (x, z) => {
+    let result = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const a = points[i];
+      const b = points[j];
+      if (
+        a.y > z !== b.y > z &&
+        x < a.x + ((b.x - a.x) * (z - a.y)) / (b.y - a.y)
+      )
+        result = !result;
+    }
+    return result;
+  };
+  for (let row = -10; row <= 10; row++) {
+    for (let col = -10; col <= 10; col++) {
+      const x = col * pitch;
+      const z = row * pitch;
+      const corners = [-0.105, 0.105];
+      if (!corners.every((dx) => corners.every((dz) => inside(x + dx, z + dz))))
+        continue;
+      const paving =
+        industrial ||
+        Math.abs(row) <= 1 ||
+        col === 3 ||
+        (index === 5 && col === -2);
+      const variation = (((row * 13 + col * 19) % 7) + 7) % 7;
+      if (!paving && variation > 3) continue;
+      const paintColor = paving
+        ? industrial && Math.abs(row) === 2
+          ? accent
+          : stone
+        : color;
+      tiles.push({
+        x,
+        z,
+        color: new T.Color(paintColor).multiplyScalar(0.88 + variation * 0.032),
+      });
+    }
+  }
+  const surface = new T.InstancedMesh(box, paint(0xffffff), tiles.length);
+  const transform = new T.Object3D();
+  transform.scale.set(0.208, 0.012, 0.208);
+  tiles.forEach((tile, i) => {
+    transform.position.set(tile.x, 0.009, tile.z);
+    transform.updateMatrix();
+    surface.setMatrixAt(i, transform.matrix);
+    surface.setColorAt(i, tile.color);
+  });
+  surface.receiveShadow = true;
+  parent.add(surface);
+}
+
+function decorateWalls(parent, points, index) {
+  const [stone, wall, accent] = shorePalettes[index];
+  for (let i = 0; i < points.length; i++) {
+    const from = points[i];
+    const to = points[(i + 1) % points.length];
+    const length = from.distanceTo(to);
+    const edge = new T.Group();
+    edge.position.set((from.x + to.x) / 2, 0, (from.y + to.y) / 2);
+    edge.rotation.y = -Math.atan2(to.y - from.y, to.x - from.x);
+    parent.add(edge);
+    mesh(edge, box, wall, vec(0, -0.175, 0), [length, 0.29, 0.055]);
+    mesh(edge, box, stone, vec(0, -0.04, 0), [length, 0.07, 0.095]);
+    mesh(edge, box, wall, vec(0, -0.304, 0), [length, 0.055, 0.083]);
+    const panels = Math.max(1, Math.floor(length / 0.23));
+    for (let j = 0; j < panels; j++) {
+      const x = ((j + 0.5) / panels - 0.5) * length;
+      mesh(edge, box, j % 3 === 1 ? accent : wall, vec(x, -0.16, 0), [
+        (length / panels) * 0.68,
+        0.13,
+        0.077,
+      ]);
+    }
+  }
+}
+
+function waterfrontDeck(parent, edge, index) {
+  const [stone, wall, accent] = shorePalettes[index];
+  const deck = new T.Group();
+  deck.position.x = edge;
+  parent.add(deck);
+  const width = index % 2 ? 1.24 : 1.05;
+  const length = index === 7 ? 1.37 : 1.02 + (index % 3) * 0.15;
+  for (let step = 0; step < 4; step++) {
+    mesh(
+      deck,
+      box,
+      step % 2 ? accent : stone,
+      vec(0.11 + step * 0.14, -0.07 - step * 0.14, 0),
+      [0.16, 0.13, width * 0.62],
+    );
+  }
+  const middle = 0.54 + length / 2;
+  mesh(deck, box, wall, vec(middle, -0.59, 0), [length, 0.17, width]);
+  for (let i = 0; i < 9; i++) {
+    mesh(
+      deck,
+      box,
+      i % 3 ? stone : accent,
+      vec(0.54 + ((i + 0.5) * length) / 9, -0.496, 0),
+      [length / 9 - 0.014, 0.032, width * 0.98],
+    );
+  }
+  for (const side of [-1, 1]) {
+    const z = side * width * 0.47;
+    mesh(deck, box, wall, vec(middle, -0.28, z), [length, 0.039, 0.042]);
+    for (const x of [0.61, middle, 0.48 + length]) {
+      mesh(deck, box, wall, vec(x, -0.39, z), [0.046, 0.23, 0.047]);
+    }
+    mesh(
+      deck,
+      cylinder,
+      wall,
+      vec(0.39 + length, -0.88, z),
+      [0.055, 0.72, 0.055],
+    );
+  }
+  if (woods[index]) {
+    mesh(deck, box, wall, vec(0.49 + length, -0.415, 0), [0.17, 0.14, 0.43]);
+    for (const z of [-0.12, 0.12])
+      mesh(
+        deck,
+        rock,
+        0x75966c,
+        vec(0.49 + length, -0.31, z),
+        [0.11, 0.12, 0.1],
+      );
+  } else {
+    for (const z of [-0.27, 0.27])
+      mesh(
+        deck,
+        sphere,
+        paint(accent, true),
+        vec(0.52 + length, -0.37, z),
+        [0.042, 0.046, 0.042],
+      );
+  }
+}
+
 function outerIsland(parent, depth, color, index) {
   const inside = innerEdge * Math.tan(Math.PI / 8) - 0.13;
   const outside = (innerEdge + depth) * Math.tan(Math.PI / 8) - 0.16;
@@ -157,6 +313,13 @@ function outerIsland(parent, depth, color, index) {
   });
   geometry.rotateX(-Math.PI / 2).translate(0, -0.31, 0);
   mesh(parent, geometry, color, vec(0, 0, 0), [1, 1, 1], true);
+  const shoreline = outline
+    .getPoints()
+    .slice(0, -1)
+    .map((point) => new T.Vector2(point.x, -point.y));
+  pavedSurface(parent, shoreline, color, index);
+  decorateWalls(parent, shoreline, index);
+  waterfrontDeck(parent, depth / 2 + (index === 2 ? 0.13 : 0), index);
   if (index !== 7)
     mesh(parent, rock, 0x424554, vec(0.38, -0.48, 0), [
       depth * 0.43,
