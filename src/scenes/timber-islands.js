@@ -1327,20 +1327,34 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       actor.root.rotation.y = restYaw;
       const lane = ((j % 2) - 0.5) * 0.15;
       const offset = vec(-heading.z * lane, 0, heading.x * lane);
-      const path = [
+      const waypoints = [
         loading,
         ramp.clone().add(offset),
         entrance.clone().add(offset),
+        polar(0.87, a + lane),
       ];
-      path.push(polar(0.87, a + lane));
+      let distance = 0;
+      const path = waypoints.slice(1).map((to, step) => {
+        const from = waypoints[step];
+        const length = from.distanceTo(to);
+        const segment = { from, to, start: distance, length };
+        distance += length;
+        return segment;
+      });
+      const pace = 0.78 + Math.random() * 0.32;
       return {
         actor,
         sleep,
         cargo,
         home,
         restYaw,
+        loading,
         path,
-        elapsed: checked ? -0.2 - j * 0.64 : 0,
+        distance,
+        outbound: distance / pace,
+        inbound: distance / (pace * 1.12),
+        strideRate: pace * 15,
+        elapsed: checked ? -Math.random() * 3.8 : 0,
         checked,
         delivered: false,
       };
@@ -1389,7 +1403,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
 
   function rest(worker) {
     worker.actor.root.position.copy(
-      worker.checked ? worker.path[0] : worker.home,
+      worker.checked ? worker.loading : worker.home,
     );
     worker.actor.root.rotation.y = worker.restYaw;
     worker.actor.pose.rotation.x = worker.checked ? 0 : -Math.PI / 2;
@@ -1410,35 +1424,32 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       rest(worker);
       return;
     }
-    worker.actor.pose.rotation.x = 0;
-    worker.actor.pose.position.y = 0;
-    worker.sleep.visible = false;
     worker.elapsed += delta;
     if (worker.elapsed < 0) {
       rest(worker);
       return;
     }
-    const { actor, path } = worker;
-    const outbound = 3.9;
-    const cycle = 8.4;
+    const { actor, path, distance, outbound, inbound, strideRate } = worker;
     const t = worker.elapsed;
-    if (t >= cycle) {
-      worker.elapsed = -0.7;
+    if (t >= outbound + inbound) {
+      // Vary each loading break so the workers don't settle into a repeating wave.
+      worker.elapsed = -(0.55 + Math.random() * 1.85);
       worker.delivered = false;
       rest(worker);
       return;
     }
+    actor.pose.rotation.x = 0;
+    actor.pose.position.y = 0;
+    worker.sleep.visible = false;
     const carrying = t < outbound;
-    const progress = carrying
-      ? t / outbound
-      : Math.max(0, 1 - (t - outbound) / (cycle - outbound - 0.6));
-    const segment = progress * (path.length - 1);
-    const step = Math.min(path.length - 2, Math.floor(segment));
-    const fraction = segment - step;
-    const from = path[step];
-    const to = path[step + 1];
-    if (carrying) walk(worker, from, to, fraction, Math.sin(t * 14));
-    else walk(worker, to, from, 1 - fraction, Math.sin(t * 14));
+    const progress = carrying ? t / outbound : 1 - (t - outbound) / inbound;
+    const traveled = progress * distance;
+    const segment =
+      path.find((part) => traveled < part.start + part.length) ?? path.at(-1);
+    const fraction = (traveled - segment.start) / segment.length;
+    const stride = Math.sin(t * strideRate);
+    if (carrying) walk(worker, segment.from, segment.to, fraction, stride);
+    else walk(worker, segment.to, segment.from, 1 - fraction, stride);
     worker.cargo.visible = carrying;
     actor.arms.forEach((arm) => {
       arm.rotation.x = carrying ? -1.05 : 0;
@@ -1464,16 +1475,16 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     },
     setTime: scenery.setTime,
     highlight,
-    refresh(change, motion) {
+    refresh(change) {
       highlight(selected);
       fire.reset(count());
       if (!change) return;
       const worker = routes[change.pillar].workers[change.action];
       if (!worker) return;
       worker.checked = pillars[change.pillar].checked[change.action];
-      worker.elapsed = -0.1;
+      worker.elapsed = -(0.08 + Math.random() * 0.62);
       worker.delivered = false;
-      if (!worker.checked || !motion) rest(worker);
+      rest(worker);
     },
     tick(time, delta, light, motion) {
       if (motion) scenery.drift(time);

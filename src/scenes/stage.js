@@ -1,15 +1,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { gold, makeHero, makeWorld, sharedResources } from "./models.js";
+import { gold, makeHero, sharedResources } from "./models.js";
 import { islandResources, makeTimberIslands } from "./timber-islands.js";
 
-const views = [
-  { eye: [8.2, 7.2, 10.9], target: 1.03 },
-  { eye: [8.9, 6.6, 11.4], target: 1.63 },
-  { eye: [11.5, 12.5, 15.2], target: -0.38 },
-  { eye: [8.8, 9.8, 10.7], target: 0.52 },
-];
+const islandView = { eye: [11.5, 12.5, 15.2], target: -0.38 };
 const heroView = { eye: [7.9, 6.6, 11.3], target: 0.75 };
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const times = {
@@ -144,9 +139,11 @@ export function mountStage(
     sprite.scale.set(width, height, 1);
     return sprite;
   }
-  const horizon = mist(gold, 0.22, 10.5, 5.1);
-  horizon.position.set(-6, 2.9, -4);
-  scene.add(horizon);
+  if (hero) {
+    const horizon = mist(gold, 0.22, 10.5, 5.1);
+    horizon.position.set(-6, 2.9, -4);
+    scene.add(horizon);
+  }
 
   const camera = new THREE.PerspectiveCamera(hero ? 42 : 40, 1, 0.1, 75);
   const controls = hero ? null : new OrbitControls(camera, canvas);
@@ -159,33 +156,35 @@ export function mountStage(
     controls.autoRotateSpeed = 0.62;
   }
 
-  let model;
-  let selected = 0;
+  const model = hero
+    ? makeHero()
+    : makeTimberIslands(pillars, mist, onDelivery);
+  scene.add(model.root);
+  model.highlight?.(0);
+  const mount = model.pieces.find((part) => part.userData.crystal);
+  if (mount) {
+    const crystal = mount.userData.crystal;
+    const progress = 0.44;
+    crystal.setEnvironment(environment.texture);
+    crystal.setProgress(progress);
+    const width = 1.35 + progress * 1.7;
+    const aura = mist(0x679dff, 0.05 + progress * 0.46, width, width * 1.35);
+    aura.position.y = crystal.group.position.y + 0.05;
+    aura.material.depthTest = false;
+    mount.add(aura);
+  }
   let auto = !reducedMotion.matches;
-  let mode = 0;
-  let flat = false;
   let frame = 0;
   let shown = false;
   let disposed = false;
-  let start = performance.now();
+  const start = performance.now();
   let last = start;
-  const readProgress = () =>
-    hero
-      ? 0.44
-      : pillars.reduce(
-          (sum, pillar) => sum + pillar.checked.filter(Boolean).length,
-          0,
-        ) / 64;
-  let targetProgress = readProgress();
-  let shownProgress = targetProgress;
-  let crystal;
-  let aura;
   let timeOfDay = "night";
   let night = 1;
   let focus;
 
   function applyLighting() {
-    if (mode === 2) {
+    if (!hero) {
       const [sun, sky, direct, diffuse, lamps] = times[timeOfDay];
       key.color.setHex(sun);
       ambient.color.setHex(sky);
@@ -199,66 +198,16 @@ export function mountStage(
         timeOfDay === "day" ? 10 : 5,
         4,
       );
-    } else {
-      key.color.setHex(0xffd5a0);
-      ambient.color.setHex(0xc8d8ff);
-      key.intensity = 3.25;
-      ambient.intensity = 1.85;
-      rim.intensity = 2.8;
-      key.position.set(-6, 9, 4);
     }
   }
 
   function setView() {
-    const view = hero ? heroView : views[mode];
+    const view = hero ? heroView : islandView;
     camera.position.set(...view.eye);
-    if (flat) camera.position.set(0.01, 15, 0.01);
     if (controls) {
-      controls.target.set(0, flat ? 0 : view.target, 0);
+      controls.target.set(0, view.target, 0);
       controls.update();
     } else camera.lookAt(0, view.target, 0);
-  }
-
-  function replay() {
-    start = performance.now();
-    requestRender();
-  }
-
-  function buildModel() {
-    if (model) {
-      scene.remove(model.root);
-      model.dispose?.();
-      disposeObjects(model.root);
-    }
-    model = hero
-      ? makeHero()
-      : mode === 2
-        ? makeTimberIslands(pillars, mist, onDelivery)
-        : makeWorld(mode, pillars, flat);
-    const mount = model.pieces.find((part) => part.userData.crystal);
-    crystal = mount?.userData.crystal;
-    if (crystal && mount) {
-      crystal.setEnvironment(environment.texture);
-      aura = mist(0x679dff, 0, 1, 1);
-      aura.position.y = crystal.group.position.y + 0.05;
-      aura.material.depthTest = false;
-      mount.add(aura);
-    }
-    model.highlight?.(selected);
-    scene.add(model.root);
-    horizon.visible = hero || mode === 0;
-  }
-
-  function setMode(nextMode, nextFlat = false) {
-    mode = nextMode;
-    flat = nextFlat;
-    focus = undefined;
-    onHover?.(-1);
-    onDelivery?.("");
-    buildModel();
-    applyLighting();
-    setView();
-    replay();
   }
 
   function requestRender() {
@@ -272,21 +221,10 @@ export function mountStage(
     const motion = !reducedMotion.matches;
     const delta = Math.min(0.06, (now - last) / 1000);
     last = now;
-    shownProgress = motion
-      ? THREE.MathUtils.damp(shownProgress, targetProgress, 8, delta)
-      : targetProgress;
-    if (Math.abs(shownProgress - targetProgress) < 0.0001)
-      shownProgress = targetProgress;
-    if (crystal) {
-      crystal.setProgress(shownProgress);
-      aura.material.opacity = 0.05 + shownProgress * 0.46;
-      const width = (1.35 + shownProgress * 1.7) * (flat ? 0.48 : 1);
-      aura.scale.set(width, width * 1.35, 1);
-    }
     for (const object of model.pieces) {
       const { delay, height } = object.userData;
       const t = motion
-        ? THREE.MathUtils.clamp((elapsed - delay) / (hero ? 1.6 : 0.86), 0, 1)
+        ? THREE.MathUtils.clamp((elapsed - delay) / 1.6, 0, 1)
         : 1;
       const rise = 1 - Math.pow(1 - t, 3);
       object.visible = rise > 0.01;
@@ -306,7 +244,7 @@ export function mountStage(
         )
           focus = undefined;
       }
-      controls.autoRotate = auto && motion && !flat && !focus;
+      controls.autoRotate = auto && motion && !focus;
       controls.update(delta);
     }
     renderer.render(scene, camera);
@@ -318,16 +256,7 @@ export function mountStage(
         }),
       );
     }
-    if (
-      motion &&
-      (hero ||
-        controls?.autoRotate ||
-        mode === 2 ||
-        focus ||
-        elapsed < 2.6 ||
-        shownProgress !== targetProgress)
-    )
-      requestRender();
+    if (motion) requestRender();
   }
 
   function resize() {
@@ -393,7 +322,7 @@ export function mountStage(
     if (index >= 0) onPillar(index);
   }
   function hover(event) {
-    if (mode === 2 && !event.buttons && event.pointerType !== "touch") {
+    if (!event.buttons && event.pointerType !== "touch") {
       onHover?.(hitPillar(event));
     }
   }
@@ -435,16 +364,13 @@ export function mountStage(
     renderer.forceContextLoss();
   }
 
-  setMode(hero ? 0 : 2);
+  applyLighting();
+  setView();
   resize();
   return {
-    setMode,
-    replay,
     dispose,
     refreshProgress(change) {
-      targetProgress = readProgress();
-      if (model.refresh) model.refresh(change, !reducedMotion.matches);
-      else buildModel();
+      model.refresh?.(change);
       requestRender();
     },
     setTime(value) {
@@ -454,8 +380,8 @@ export function mountStage(
       requestRender();
     },
     focusIsland(index) {
-      if (mode !== 2 || !controls) return;
-      const view = views[2];
+      if (!controls) return;
+      const view = islandView;
       const point = model.centers[index];
       const target = point
         ? point.clone().multiplyScalar(0.53).setY(0.18)
@@ -471,7 +397,6 @@ export function mountStage(
       requestRender();
     },
     select(index) {
-      selected = index;
       model.highlight?.(index);
       requestRender();
     },

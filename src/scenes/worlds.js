@@ -137,21 +137,9 @@ function readWorld() {
 }
 
 const data = readWorld();
-const modes = [
-  [
-    "八脊之山",
-    "The Mountain",
-    "沿著八條發光山脊，看每一步如何通往同一座山頂。",
-  ],
-  ["目標之柱", "The Pillars", "每一塊行動基石，都在托起你的目標。"],
-  ["願望浮島", "The Islands", "勾選行動，讓島上的工坊持續為中央火炬送燃料。"],
-  ["立體曼陀羅", "The Mandala", "從九宮格的平面藍圖，看見行動逐格升起。"],
-];
 
 let stage;
-let mode = 2;
 let selected = 0;
-let flat = false;
 let saving = false;
 let auto = false;
 const canvas = $("#scene");
@@ -161,18 +149,6 @@ let labelPositions = [];
 $("#goal").textContent = data.goal;
 $("#goal").title = data.goal;
 $("#sample").hidden = data !== seed;
-
-const modeButtons = modes.map(([name, english], index) => {
-  const button = document.createElement("button");
-  const label = document.createElement("strong");
-  const subtitle = document.createElement("small");
-  label.textContent = name;
-  subtitle.textContent = english;
-  button.append(label, subtitle);
-  button.onclick = () => switchMode(index);
-  return button;
-});
-$("#modes").replaceChildren(...modeButtons);
 
 const pillarButtons = data.pillars.map((pillar, index) => {
   const button = document.createElement("button");
@@ -212,7 +188,6 @@ const labels = data.pillars
 $("#islandLabels").replaceChildren(...labels);
 
 function updateLabels() {
-  if (mode !== 2) return;
   labels.forEach((label, index) => {
     const point = labelPositions[index];
     const inView =
@@ -227,25 +202,6 @@ function updateLabels() {
     label.style.top = point[1] + "%";
     label.classList.toggle("active", index === selected);
   });
-}
-
-function switchMode(index) {
-  mode = index;
-  flat = false;
-  canvas.closest(".viewport").dataset.world = mode === 2 ? "islands" : "";
-  $(".island-tools").hidden = mode !== 2 || canvas.hidden;
-  $("#islandLabels").hidden = mode !== 2 || canvas.hidden;
-  $("#islandWood").hidden = mode !== 2;
-  $("#replay").hidden = mode === 2;
-  $("#delivery").textContent = "";
-  $("#flat").hidden = mode !== 3;
-  $("#flat").setAttribute("aria-pressed", "false");
-  $("#sceneName").textContent = modes[mode][0];
-  $("#sceneDescription").textContent = modes[mode][2];
-  modeButtons.forEach((button, i) =>
-    button.setAttribute("aria-pressed", String(i === mode)),
-  );
-  stage?.setMode(mode);
 }
 
 function choose(index, focus = false) {
@@ -295,7 +251,9 @@ function updateProgress() {
     place +
     (woods[selected] ? " · " + woods[selected] : "") +
     "｜" +
-    (amount ? "每趟 " + amount + unit + fuel : "勾選行動後開始供應");
+    (amount
+      ? `${amount} 位工人搬運${fuel}，每人每趟 1 ${unit}`
+      : "勾選行動後開始供應");
   $("#chosen").textContent = "本支柱 " + amount + " / 8";
 }
 
@@ -381,12 +339,6 @@ $("#rotate").onclick = () => {
   auto = !auto;
   syncRotation();
 };
-$("#replay").onclick = () => stage?.replay();
-$("#flat").onclick = () => {
-  flat = !flat;
-  $("#flat").setAttribute("aria-pressed", String(flat));
-  stage?.setMode(mode, flat);
-};
 $("#daylight").addEventListener("click", (event) => {
   const button = event.target.closest("[data-time]");
   if (!button) return;
@@ -415,8 +367,6 @@ $("#toggleLabels").onclick = (event) => {
   updateLabels();
 };
 
-canvas.closest(".viewport").dataset.time = "night";
-switchMode(mode);
 choose(0);
 try {
   stage = mountStage(canvas, {
@@ -439,7 +389,10 @@ try {
 } catch (error) {
   console.warn("Mandala scene could not start", error);
 }
-if (!stage) unavailable();
+if (stage) {
+  $(".island-tools").hidden = false;
+  $("#islandLabels").hidden = false;
+} else unavailable();
 syncRotation();
 window.addEventListener("pagehide", (event) => {
   if (!event.persisted) stage?.dispose();

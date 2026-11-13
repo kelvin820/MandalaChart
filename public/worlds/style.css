@@ -58,36 +58,6 @@ main {
   font-size: 12px;
   margin: 0 0 8px;
 }
-nav {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-nav button {
-  padding: 11px 14px;
-  text-align: left;
-}
-nav button:hover {
-  background: var(--surface-raised);
-}
-nav button[aria-pressed="true"] {
-  background: var(--navy);
-  color: #fff3e2;
-  border-color: var(--navy);
-}
-nav strong,
-nav small {
-  display: block;
-}
-nav small {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--dim);
-}
-nav button[aria-pressed="true"] small {
-  color: var(--amber);
-}
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(254px, 28%);
@@ -111,17 +81,17 @@ nav button[aria-pressed="true"] small {
   background: #151e33ee;
   font-size: 12px;
 }
-.goal-label {
-  margin-top: 28px;
-}
 .viewport {
   position: relative;
   min-height: 600px;
   overflow: hidden;
   color: #fff5e7;
-  background:
-    radial-gradient(ellipse at 37% 32%, #5d455c 0%, transparent 55%),
-    radial-gradient(ellipse at 64% 56%, #344974 0%, #19243d 60%, #10172b 100%);
+  background: radial-gradient(
+    ellipse at 50% 38%,
+    #293b62,
+    #101b35 73%,
+    #101727
+  );
 }
 .viewport canvas {
   width: 100%;
@@ -138,7 +108,7 @@ nav button[aria-pressed="true"] small {
 .goal-label {
   position: absolute;
   z-index: 1;
-  top: 22px;
+  top: 65px;
   pointer-events: none;
 }
 .scene-title {
@@ -220,11 +190,6 @@ nav button[aria-pressed="true"] small {
 }
 .scene-footer > span {
   color: #e7e4f1;
-}
-.scene-footer div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 .scene-footer button {
   pointer-events: auto;
@@ -381,18 +346,15 @@ dialog::backdrop {
   .brand-logo {
     width: 40px;
   }
-  nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .workspace {
     grid-template-columns: minmax(0, 1fr);
   }
   .viewport {
-    min-height: clamp(450px, 85vw, 550px);
+    min-height: 500px;
   }
   .scene-title,
   .goal-label {
-    top: 16px;
+    top: 100px;
   }
   .scene-title {
     left: 15px;
@@ -438,21 +400,13 @@ dialog::backdrop {
   }
 }
 
-.viewport[data-world="islands"] {
-  background: radial-gradient(
-    ellipse at 50% 38%,
-    #293b62,
-    #101b35 73%,
-    #101727
-  );
-}
-.viewport[data-world="islands"][data-time="dawn"] {
+.viewport[data-time="dawn"] {
   background: linear-gradient(168deg, #4e5c83, #a48791 49%, #4c7894);
 }
-.viewport[data-world="islands"][data-time="day"] {
+.viewport[data-time="day"] {
   background: linear-gradient(168deg, #4f7593, #7fa4ae 50%, #477b8f);
 }
-.viewport[data-world="islands"][data-time="dusk"] {
+.viewport[data-time="dusk"] {
   background: linear-gradient(163deg, #554764, #a57078 52%, #344564);
 }
 .island-tools {
@@ -466,13 +420,6 @@ dialog::backdrop {
   flex-wrap: wrap;
   gap: 6px;
   pointer-events: none;
-}
-.viewport[data-world="islands"] .scene-title {
-  top: 65px;
-}
-.viewport[data-world="islands"] .goal-label {
-  top: 65px;
-  margin-top: 0;
 }
 #daylight {
   display: flex;
@@ -523,18 +470,11 @@ dialog::backdrop {
   font-size: 11px;
 }
 @media (max-width: 700px) {
-  .viewport[data-world="islands"] {
-    min-height: 500px;
-  }
   .island-tools {
     gap: 3px;
   }
   .island-tools button {
     padding-inline: 5px;
-  }
-  .viewport[data-world="islands"] .scene-title,
-  .viewport[data-world="islands"] .goal-label {
-    top: 100px;
   }
   .delivery-status {
     bottom: 108px;

@@ -171,7 +171,7 @@ function renderChart() {
       .filter((s) => s[1])
       .map((s) => `<span>${s[0]}：${escape(s[1])}</span>`)
       .join("") || "<span>尚未設定定位資訊，可隨時編輯目標補充。</span>"
-  }</div></div><div class="chart-progress"><div>支柱展開 ${p.expanded}/8　·　行動檢核 ${p.done}/${p.total}</div><div class="progress-track"><i style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></i></div></div></div>${c.stale.length ? '<div class="stale-warning">上層目標或支柱已修改，部分行動需要重新檢查。舊內容仍保留，確認適用或重新生成後即可更新。</div>' : ""}<div class="chart-layout"><section>${selected !== null ? '<div id="branchArea"></div>' : wholeBoard ? renderWholeBoard(c) : overviewGrid(c)}</section><aside class="chart-aside"><h3>讓目標有根基。</h3><p>八個支柱是起點，不是唯一答案。你可以編輯、換個切入點，再慢慢拆到適合自己的大小。</p>${structureProgress(c)}<div class="divider"></div><button data-action="export">匯出曼陀羅表 ↗</button><button data-action="worlds" ${p.expanded < 8 || c.stale.length ? "disabled" : ""}>探索我的 3D 目標之境 ↗</button><p class="note" style="margin-top:12px">${p.expanded < 8 ? "完成八個支柱的拆解後，讓整張表長成立體模型。" : c.stale.length ? "先檢查更新後的行動，再檢視立體成果。" : "結構已建立。用四種視角，看見小行動如何支持目標。"}</p></aside></div>`;
+  }</div></div><div class="chart-progress"><div>支柱展開 ${p.expanded}/8　·　行動檢核 ${p.done}/${p.total}</div><div class="progress-track"><i style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></i></div></div></div>${c.stale.length ? '<div class="stale-warning">上層目標或支柱已修改，部分行動需要重新檢查。舊內容仍保留，確認適用或重新生成後即可更新。</div>' : ""}<div class="chart-layout"><section>${selected !== null ? '<div id="branchArea"></div>' : wholeBoard ? renderWholeBoard(c) : overviewGrid(c)}</section><aside class="chart-aside"><h3>讓目標有根基。</h3><p>八個支柱是起點，不是唯一答案。你可以編輯、換個切入點，再慢慢拆到適合自己的大小。</p>${structureProgress(c)}<div class="divider"></div><button data-action="export">匯出曼陀羅表 ↗</button><button data-action="worlds" ${p.expanded < 8 || c.stale.length ? "disabled" : ""}>探索我的 3D 目標之境 ↗</button><p class="note" style="margin-top:12px">${p.expanded < 8 ? "完成八個支柱的拆解後，讓整張表長成立體模型。" : c.stale.length ? "先檢查更新後的行動，再檢視立體成果。" : "結構已建立。到願望浮島查看每項行動的進度。"}</p></aside></div>`;
   renderBranch();
 }
 let wholeBoard = false;
@@ -735,7 +735,7 @@ function openWorlds() {
   show(
     modal(
       "你的小行動，已經形成一個有方向的世界。",
-      '<p>勾選做過的行動，讓核心水晶逐漸亮起。進度會同步儲存到這張表。</p><iframe title="我的四種立體曼陀羅模型" class="world-frame" src="/worlds/"></iframe>',
+      '<p>勾選做過的行動，讓島上的工人為中央火炬送燃料。進度會同步儲存到這張表。</p><iframe title="我的願望浮島" class="world-frame" src="/worlds/"></iframe>',
     ),
     "world-dialog",
   );
