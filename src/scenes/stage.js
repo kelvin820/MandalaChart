@@ -1,11 +1,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { gold, makeHero, sharedResources } from "./models.js";
 import { islandResources, makeTimberIslands } from "./timber-islands.js";
 
 const islandView = { eye: [11.5, 12.5, 15.2], target: -0.38 };
-const heroView = { eye: [7.9, 6.6, 11.3], target: 0.75 };
+const heroView = { eye: [7.9, 7, 11.6], target: 1.08 };
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const times = {
   dawn: [0xffd4b0, 0x7e93c2, 2.25, 1.65, 0.48],
@@ -91,17 +90,8 @@ export function mountStage(
   renderer.setClearColor(0x000000, 0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.42;
-  renderer.transmissionResolutionScale = 0.7;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
-
-  const environmentRoom = new RoomEnvironment();
-  const reflections = new THREE.PMREMGenerator(renderer);
-  const environment = reflections.fromScene(environmentRoom, 0.015, 0.1, 70, {
-    size: 128,
-  });
-  reflections.dispose();
-  environmentRoom.dispose();
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x171f3a, 0.034);
@@ -157,22 +147,10 @@ export function mountStage(
   }
 
   const model = hero
-    ? makeHero()
+    ? makeHero(mist)
     : makeTimberIslands(pillars, mist, onDelivery);
   scene.add(model.root);
   model.highlight?.(0);
-  const mount = model.pieces.find((part) => part.userData.crystal);
-  if (mount) {
-    const crystal = mount.userData.crystal;
-    const progress = 0.44;
-    crystal.setEnvironment(environment.texture);
-    crystal.setProgress(progress);
-    const width = 1.35 + progress * 1.7;
-    const aura = mist(0x679dff, 0.05 + progress * 0.46, width, width * 1.35);
-    aura.position.y = crystal.group.position.y + 0.05;
-    aura.material.depthTest = false;
-    mount.add(aura);
-  }
   let auto = !reducedMotion.matches;
   let frame = 0;
   let shown = false;
@@ -358,7 +336,6 @@ export function mountStage(
     model?.dispose?.();
     disposeObjects(scene);
     halo.dispose();
-    environment.dispose();
     key.shadow.dispose();
     renderer.dispose();
     renderer.forceContextLoss();

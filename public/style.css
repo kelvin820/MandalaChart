@@ -249,13 +249,14 @@ main {
 .hero-art:not(:has(canvas))::after {
   content: "";
   position: absolute;
-  top: 41%;
-  left: calc(50% - 21px);
-  width: 42px;
-  height: 42px;
-  transform: rotate(45deg);
-  background: linear-gradient(135deg, #fff1cb, #d79d59);
-  box-shadow: 0 0 48px #eec28588;
+  top: 47%;
+  left: 50%;
+  width: clamp(72px, 16vw, 112px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 23.4%;
+  background: url("/brand/mandala.svg") center / contain no-repeat;
+  box-shadow: 0 0 54px #ffab554f;
 }
 .structure-progress {
   border: 1px solid #384668;

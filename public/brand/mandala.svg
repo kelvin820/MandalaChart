@@ -1,24 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">目標之境</title>
+  <title id="title">願望之境</title>
   <defs>
     <linearGradient id="midnight" x2="0" y2="1">
       <stop stop-color="#29395f"/>
       <stop offset="1" stop-color="#11192d"/>
     </linearGradient>
-    <linearGradient id="gold" x2="0" y2="1">
-      <stop stop-color="#fff0cc"/>
-      <stop offset="1" stop-color="#db9b54"/>
+    <linearGradient id="flame" x2="0" y2="1">
+      <stop stop-color="#ffad63"/>
+      <stop offset="1" stop-color="#ea753d"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="15" fill="url(#midnight)"/>
-  <path d="M32 10 54 32 32 54 10 32Z" fill="none" stroke="#ad8b60" stroke-opacity=".68"/>
-  <g fill="#ebc389">
-    <circle cx="32" cy="12" r="2.3"/><circle cx="46" cy="18" r="2.3"/>
-    <circle cx="52" cy="32" r="2.3"/><circle cx="46" cy="46" r="2.3"/>
-    <circle cx="32" cy="52" r="2.3"/><circle cx="18" cy="46" r="2.3"/>
-    <circle cx="12" cy="32" r="2.3"/><circle cx="18" cy="18" r="2.3"/>
+  <ellipse cx="32" cy="47" rx="23" ry="9" fill="none" stroke="#b69970" stroke-opacity=".7"/>
+  <g fill="#d0ad77">
+    <circle cx="9" cy="47" r="1.5"/><circle cx="15.7" cy="40.6" r="1.5"/>
+    <circle cx="32" cy="38" r="1.5"/><circle cx="48.3" cy="40.6" r="1.5"/>
+    <circle cx="55" cy="47" r="1.5"/><circle cx="48.3" cy="53.4" r="1.5"/>
+    <circle cx="32" cy="56" r="1.5"/><circle cx="15.7" cy="53.4" r="1.5"/>
   </g>
-  <path d="M32 17 43 32 32 47 21 32Z" fill="url(#gold)"/>
-  <path d="M32 17 32 32 21 32Z" fill="#fff6df"/>
-  <path d="M32 32 43 32 32 47Z" fill="#b57641"/>
+  <path d="M22 35c-3-6 1-12 5-16 0 4 2 5 3 5 3-4 6-8 4-15 8 6 12 14 10 21-1 4-3 6-6 8H26Z" fill="url(#flame)"/>
+  <path d="M27 37c-2-4 0-7 3-10 0 2 2 3 3 2 2-2 3-4 3-7 5 5 5 11 1 15Z" fill="#fff0bd"/>
+  <path d="M19 37h26l-6 7h-4l1 6h-8l1-6h-4Z" fill="#e5bb83"/>
+  <path d="M20 37h24" stroke="#ffe0a8" stroke-width="2" stroke-linecap="round"/>
 </svg>

@@ -402,50 +402,233 @@ export function makeWorld(mode, pillars, flat) {
   };
 }
 
-export function makeHero() {
+function hopeTorch(parent, mist) {
+  const torch = new THREE.Group();
+  torch.position.y = 0.22;
+  parent.add(torch);
+  const bronze = stone(0x8b502f, { metalness: 0.25, roughness: 0.41 });
+  const goldRim = stone(0xe0a96d, { metalness: 0.33, roughness: 0.34 });
+  const charcoal = stone(0x392821);
+  const ash = stone(0x20181a);
+  const vessel = (top, bottom, height, y, material, sides = 12) =>
+    cylinder(
+      torch,
+      top,
+      bottom,
+      height,
+      sides,
+      new THREE.Vector3(0, y, 0),
+      material,
+    );
+
+  vessel(0.94, 1.09, 0.18, 0.08, base, 8);
+  vessel(0.69, 0.85, 0.16, 0.25, bronze, 8);
+  vessel(0.5, 0.65, 0.59, 0.62, brass, 8);
+  vessel(0.69, 0.49, 0.19, 1.01, bronze, 8);
+  vessel(1.0, 0.63, 0.42, 1.28, bronze);
+  vessel(1.01, 0.97, 0.078, 1.5, goldRim);
+  vessel(0.85, 0.78, 0.048, 1.545, ash);
+  for (let i = 0; i < 5; i++) {
+    const a = (i * tau) / 5;
+    const stick = vessel(0.1, 0.135, 0.85, 1.59, charcoal, 6);
+    stick.rotation.set(Math.PI / 2, 0, a, "ZYX");
+    stick.position.add(polar(0.22, a));
+  }
+
+  const glowMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      time: { value: 0 },
+      inner: { value: new THREE.Color(0xfff5b0) },
+      middle: { value: new THREE.Color(0xffac49) },
+      edge: { value: new THREE.Color(0xee5f29) },
+    },
+    vertexShader: `
+      uniform float time;
+      varying vec3 flamePosition;
+      varying vec3 flameNormal;
+      varying vec3 viewDirection;
+      void main() {
+        flamePosition = position;
+        float height = position.y;
+        vec3 bent = position;
+        bent.x += height * height * (0.12 + 0.12 * sin(time * 3.1 + height * 6.0));
+        bent.z += height * height * 0.1 * cos(time * 2.4 + height * 5.0);
+        vec4 view = modelViewMatrix * vec4(bent, 1.0);
+        flameNormal = normalize(normalMatrix * normal);
+        viewDirection = -view.xyz;
+        gl_Position = projectionMatrix * view;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 inner;
+      uniform vec3 middle;
+      uniform vec3 edge;
+      varying vec3 flamePosition;
+      varying vec3 flameNormal;
+      varying vec3 viewDirection;
+      void main() {
+        float height = clamp(flamePosition.y, 0.0, 1.0);
+        float facing = clamp(dot(normalize(flameNormal), normalize(viewDirection)), 0.0, 1.0);
+        vec3 warm = mix(middle, edge, smoothstep(0.36, 1.0, height));
+        vec3 heat = mix(warm, inner, facing * (1.0 - smoothstep(0.15, 0.78, height)));
+        gl_FragColor = vec4(heat, 1.0);
+        #include <colorspace_fragment>
+      }
+    `,
+  });
+  const profile = new THREE.LatheGeometry(
+    [
+      [0.08, 0],
+      [0.33, 0.095],
+      [0.42, 0.23],
+      [0.36, 0.43],
+      [0.24, 0.62],
+      [0.11, 0.84],
+      [0, 1],
+    ].map(([radius, y]) => new THREE.Vector2(radius, y)),
+    20,
+  );
+  const main = mesh(
+    torch,
+    profile,
+    glowMaterial,
+    new THREE.Vector3(0, 1.6, 0),
+    [1.44, 1.86, 1.44],
+    false,
+  );
+  const tongues = [
+    [-0.28, -0.13, -0.31, 1.2],
+    [0.33, 0.11, 0.38, 1.13],
+    [-0.1, 0.33, 0.17, 0.86],
+  ].map(([x, z, lean, height]) => {
+    const tongue = mesh(
+      torch,
+      profile,
+      glowMaterial,
+      new THREE.Vector3(x, 1.57, z),
+      [0.82, height, 0.82],
+      false,
+    );
+    tongue.rotation.z = lean;
+    return tongue;
+  });
+  const halo = mist(0xff8238, 0.34, 5.8, 5.1);
+  halo.position.y = 2.3;
+  torch.add(halo);
+  const light = new THREE.PointLight(0xff8a3c, 24, 8);
+  light.position.y = 2.35;
+  torch.add(light);
+  const embers = Array.from({ length: 15 }, () =>
+    mesh(
+      torch,
+      beacon,
+      goldLight,
+      new THREE.Vector3(),
+      [0.034, 0.034, 0.034],
+      false,
+    ),
+  );
+  return (elapsed, motion) => {
+    const time = motion ? elapsed : 0;
+    glowMaterial.uniforms.time.value = time;
+    main.scale.y = 1.86 + Math.sin(time * 6) * 0.09;
+    tongues.forEach((tongue, i) => {
+      tongue.rotation.y = time * 0.46 + i * 1.9;
+    });
+    light.intensity = 24 + Math.sin(time * 7.2) * 2;
+    embers.forEach((ember, i) => {
+      const age = (time * (0.34 + (i % 3) * 0.08) + i * 0.39) % 1;
+      ember.position.copy(
+        polar(0.16 + age * 0.73, i * 2.39 + age * 0.7, 2.08 + age * 2.18),
+      );
+      ember.scale.setScalar(0.044 * (1 - age));
+    });
+  };
+}
+
+export function makeHero(mist) {
   const root = new THREE.Group();
   const pieces = [];
   const floor = piece(root, pieces, new THREE.Vector3(), 0);
-  cylinder(floor, 4.7, 4.76, 0.29, 8, new THREE.Vector3(0, -0.23, 0), base);
-  ring(floor, 4.65, -0.07, gold, 0.72, 8);
-  ring(floor, 5.2, -0.14, 0x99a8da, 0.48);
-  ring(floor, 5.55, -0.14, gold, 0.28);
+  const cliff = stone(0x263549);
+  const land = stone(0x527071);
+  const grass = stone(0x637c72);
+  const edge = stone(0x8d846f);
+  ring(floor, 4.92, -0.87, 0x9dafd1, 0.38);
+  ring(floor, 5.29, -0.88, gold, 0.24);
   const center = piece(root, pieces, new THREE.Vector3(), 0.64);
-  cylinder(center, 0.73, 0.92, 1.55, 8, new THREE.Vector3(0, 0.69, 0), glass);
-  cylinder(center, 0.82, 0.85, 0.08, 8, new THREE.Vector3(0, 1.5, 0), brass);
-  goal(center, 2.58, 0.61);
+  cylinder(center, 1.88, 0.95, 0.85, 8, new THREE.Vector3(0, -0.49, 0), cliff);
+  cylinder(center, 1.92, 1.88, 0.13, 8, new THREE.Vector3(0, 0, 0), edge);
+  cylinder(center, 1.82, 1.92, 0.16, 8, new THREE.Vector3(0, 0.12, 0), land);
+  const torchTick = hopeTorch(center, mist);
+  const foliage = stone(0x4b6766);
+  const wood = stone(0x6d5246);
+  const treeTop = new THREE.ConeGeometry(1, 1, 6);
   for (let i = 0; i < 8; i++) {
-    const a = (tau * i) / 8;
-    const h = 0.65 + 1.23 * (0.5 + 0.5 * Math.sin(a - 0.65));
-    const tower = piece(root, pieces, polar(3.11, a), 0.12 + i * 0.085);
-    tower.rotation.y = -a;
-    mesh(tower, cube, base, new THREE.Vector3(0, 0.06, 0), [1.18, 0.2, 1.18]);
-    mesh(tower, cube, i % 3 ? glass : base, new THREE.Vector3(0, h / 2, 0), [
-      0.77,
-      h,
-      0.77,
-    ]);
-    mesh(
-      tower,
-      cube,
-      brass,
-      new THREE.Vector3(0, h + 0.02, 0),
-      [0.82, 0.055, 0.82],
+    const a = (tau * (i + 0.5)) / 8;
+    const radius = [0.88, 1.06, 0.96, 1.04][i % 4];
+    const island = piece(root, pieces, polar(3.55, a), 0.12 + i * 0.085);
+    island.rotation.y = -a;
+    cylinder(
+      island,
+      radius,
+      radius * 0.55,
+      0.67,
+      6,
+      new THREE.Vector3(0, -0.39, 0),
+      cliff,
     );
-    mesh(
-      tower,
-      cube,
-      goldLight,
-      new THREE.Vector3(0, h + 0.055, 0),
-      [0.4, 0.023, 0.4],
-      false,
+    cylinder(
+      island,
+      radius + 0.045,
+      radius,
+      0.12,
+      6,
+      new THREE.Vector3(),
+      edge,
     );
-    line(floor, [polar(0.92, a, 0.03), polar(4.48, a, 0.03)], gold, 0.42);
-    for (let j = 0; j < 3; j++) {
-      action(floor, polar(1.34 + 0.41 * j, a, 0.038), false, goldLight, 0.045);
+    cylinder(
+      island,
+      radius,
+      radius + 0.045,
+      0.12,
+      6,
+      new THREE.Vector3(0, 0.1, 0),
+      i % 3 === 0 ? grass : land,
+    );
+    for (let j = 0; j < 2 + (i % 2); j++) {
+      const x = 0.19 + (j % 2) * 0.35;
+      const z = (j - 0.65) * 0.39;
+      const height = 0.47 + ((i * 13 + j * 7) % 6) * 0.09;
+      cylinder(
+        island,
+        0.05,
+        0.067,
+        0.31,
+        6,
+        new THREE.Vector3(x, 0.31, z),
+        wood,
+      );
+      mesh(
+        island,
+        treeTop,
+        j === 1 ? grass : foliage,
+        new THREE.Vector3(x, 0.34 + height * 0.38, z),
+        [height * 0.39, height, height * 0.39],
+      );
     }
+    const path = [polar(1.79, a, 0.115), polar(2.8, a, 0.115)];
+    line(floor, path, gold, 0.48);
+    for (let j = 0; j < 3; j++)
+      action(floor, polar(1.98 + 0.25 * j, a, 0.115), false, goldLight, 0.048);
   }
-  return { root, pieces };
+  return {
+    root,
+    pieces,
+    tick(time, _delta, _night, motion) {
+      torchTick(time, motion);
+    },
+  };
 }
 
 // Scene instances reuse these resources when switching models.

@@ -436,7 +436,7 @@ function svgChart() {
     });
   });
   let s =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1180" viewBox="0 0 1080 1180"><rect width="1080" height="1180" fill="#f7f7ef"/><text x="45" y="55" font-family="Arial,sans-serif" font-size="25" fill="#304636">目標之境 · 我的曼陀羅表</text><text x="45" y="88" font-family="Arial,sans-serif" font-size="13" fill="#7d8b74">一個核心目標 / 八個支柱 / 六十四個開始的可能</text>';
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1180" viewBox="0 0 1080 1180"><rect width="1080" height="1180" fill="#f7f7ef"/><text x="45" y="55" font-family="Arial,sans-serif" font-size="25" fill="#304636">願望之境 · 我的曼陀羅表</text><text x="45" y="88" font-family="Arial,sans-serif" font-size="13" fill="#7d8b74">一個核心目標 / 八個支柱 / 六十四個開始的可能</text>';
   for (let y = 0; y < 9; y++)
     for (let x = 0; x < 9; x++) {
       let d = cells[y][x],
@@ -453,7 +453,7 @@ function svgChart() {
     }
   return (
     s +
-    '<text x="45" y="1150" font-family="Arial,sans-serif" font-size="12" fill="#7d8b74">MANDALA LAB — 先有方向，再走出自己的路。</text></svg>'
+    '<text x="45" y="1150" font-family="Arial,sans-serif" font-size="12" fill="#7d8b74">WISHLANDS</text></svg>'
   );
 }
 $("#export").onclick = () => {

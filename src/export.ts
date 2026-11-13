@@ -142,7 +142,7 @@ export function svgChart(chart: Chart, fontBase64?: string) {
     <defs>${font}<linearGradient id="pillar-direction"><stop stop-color="#87a7ca" stop-opacity="0"/><stop offset=".6" stop-color="#7396bf" stop-opacity=".19"/><stop offset="1" stop-color="#4679ac" stop-opacity=".42"/></linearGradient></defs>
     <rect width="${sheetWidth}" height="${sheetHeight}" fill="#fbf8f0"/>
     <text x="36" y="56" font-size="34" font-weight="800" fill="#203856">我的曼陀羅表</text>
-    <text x="1182" y="53" text-anchor="end" font-size="12" letter-spacing="2.1" fill="#53627a">MANDALA STUDIO</text>
+    <text x="1182" y="53" text-anchor="end" font-size="12" letter-spacing="2.1" fill="#53627a">WISHLANDS</text>
     <path d="M36 77H1182" stroke="#a6916e"/>
     ${backgrounds.join("")}${frames}${arrows()}${labels.join("")}
     <text x="36" y="836" font-size="13" fill="#4f5c70">中心目標 → 八個支柱 → 六十四項行動</text>
