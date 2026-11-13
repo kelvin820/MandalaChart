@@ -458,14 +458,21 @@ dialog::backdrop {
 .island-tools {
   position: absolute;
   z-index: 2;
-  top: 100px;
+  top: 12px;
   left: 16px;
-  right: 16px;
+  right: 90px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 6px;
   pointer-events: none;
+}
+.viewport[data-world="islands"] .scene-title {
+  top: 65px;
+}
+.viewport[data-world="islands"] .goal-label {
+  top: 65px;
+  margin-top: 0;
 }
 #daylight {
   display: flex;
@@ -520,7 +527,14 @@ dialog::backdrop {
     min-height: 500px;
   }
   .island-tools {
-    top: 108px;
+    gap: 3px;
+  }
+  .island-tools button {
+    padding-inline: 5px;
+  }
+  .viewport[data-world="islands"] .scene-title,
+  .viewport[data-world="islands"] .goal-label {
+    top: 100px;
   }
   .delivery-status {
     bottom: 108px;

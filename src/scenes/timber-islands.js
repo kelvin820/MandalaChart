@@ -1,10 +1,10 @@
 import * as T from "three";
 
-export const woods = ["赤松", "白樺", "", "橡樹", "", "櫻樹", "金合歡", ""];
+export const woods = ["", "赤松", "", "橡樹", "", "櫻樹", "", ""];
 
 const grove = [
   [0x416d4a, 0x9a5735, "spire"],
-  [0x94ab5b, 0xf1e6c7, "round"],
+  [0x416d4a, 0x9a5735, "spire"],
   [0xb95536, 0x994731, "round"],
   [0x597f43, 0x72523d, "broad"],
   [0x3e7771, 0xa07952, "spire"],
@@ -13,13 +13,13 @@ const grove = [
   [0xa36b47, 0x985643, "spire"],
 ];
 export const workshops = [
+  ["天然瓦斯站", "天然瓦斯", "罐"],
   ["赤松林場", "赤松柴", "根"],
-  ["白樺木工坊", "白樺柴", "根"],
   ["黑岩煤礦", "煤塊", "塊"],
   ["橡樹農場", "秸稈捆", "捆"],
   ["陸地油田", "燃油", "桶"],
   ["櫻樹園", "修枝柴", "根"],
-  ["金合歡壓製場", "木質燃料磚", "塊"],
+  ["陸地油田・直立井", "原油", "桶"],
   ["海上鑽油平台", "原油", "桶"],
 ];
 const coreEdge = 1.67;
@@ -203,7 +203,7 @@ function courier(color, index) {
   );
   mesh(upper, sphere, 0x4b3731, vec(0, 0.632, 0.005), [0.159, 0.078, 0.14]);
   const mining = index === 2;
-  const oil = index === 4 || index === 7;
+  const oil = [0, 4, 6, 7].includes(index);
   const helmet = mining ? 0xeeb32e : oil ? 0xf4f0dc : 0x9b4b3f;
   mesh(upper, sphere, helmet, vec(0, 0.657, 0), [0.168, 0.104, 0.154]);
   mesh(upper, box, helmet, vec(0, 0.633, 0.115), [0.27, 0.025, 0.16]);
@@ -317,26 +317,30 @@ function bridge(parent, from, to, index) {
 }
 
 function fuel(parent, point, index) {
-  if (index === 4 || index === 7) {
+  if ([0, 4, 6, 7].includes(index)) {
     const barrel = new T.Group();
     barrel.position.copy(point);
     parent.add(barrel);
     mesh(
       barrel,
       cylinder,
-      index === 4 ? 0x26756b : 0x426581,
+      { 0: 0x79bdc4, 4: 0x26756b, 6: 0xa45a3d, 7: 0x426581 }[index],
       vec(0, 0, 0),
       [0.09, 0.24, 0.09],
     );
+    if (index === 0) {
+      mesh(barrel, sphere, 0x79bdc4, vec(0, 0.11, 0), [0.09, 0.06, 0.09]);
+      mesh(barrel, cylinder, 0x536473, vec(0, 0.17, 0), [0.029, 0.045, 0.029]);
+      return barrel;
+    }
     for (const y of [-0.083, 0.083])
       mesh(barrel, cylinder, 0xd5b478, vec(0, y, 0), [0.094, 0.024, 0.094]);
     return barrel;
   }
   if (index === 2)
     return mesh(parent, rock, 0x302e3b, point, [0.107, 0.09, 0.104]);
-  if (index === 3 || index === 6) {
-    const color = { 2: 0x39333b, 3: 0xd2a050, 6: 0xb67752 }[index];
-    return mesh(parent, box, color, point, [0.18, 0.14, 0.23]);
+  if (index === 3) {
+    return mesh(parent, box, 0xd2a050, point, [0.18, 0.14, 0.23]);
   }
   const piece = log(parent, point, grove[index][1], 0.53);
   piece.rotation.y = Math.PI / 2;
@@ -347,6 +351,46 @@ function workshop(parent, point, index) {
   const site = new T.Group();
   parent.add(site);
   site.position.copy(point);
+  if (index === 0) {
+    for (const z of [-0.27, 0.27]) {
+      mesh(
+        site,
+        cylinder,
+        0x78afb5,
+        vec(0, 0.3, z),
+        [0.21, 0.75, 0.21],
+      ).rotation.z = Math.PI / 2;
+      for (const x of [-0.35, 0.35])
+        mesh(site, sphere, 0x78afb5, vec(x, 0.3, z), [0.14, 0.21, 0.21]);
+      mesh(site, box, 0x5f7885, vec(0, 0.075, z), [0.49, 0.15, 0.28]);
+    }
+    mesh(site, cylinder, 0xead4a2, vec(0.49, 0.48, 0), [0.05, 0.96, 0.05]);
+    mesh(site, box, 0xead4a2, vec(0.37, 0.87, 0), [0.24, 0.09, 0.1]);
+    mesh(
+      site,
+      sphere,
+      paint(0xffbd65, true),
+      vec(0.49, 0.98, 0),
+      [0.07, 0.07, 0.07],
+    );
+    return;
+  }
+  if (index === 6) {
+    const steel = 0xb8774f;
+    const head = new T.Group();
+    site.add(head);
+    for (const x of [-0.27, 0.27]) {
+      mesh(site, box, steel, vec(x, 0.67, 0), [0.09, 1.34, 0.12]);
+      mesh(site, box, steel, vec(x, 0.05, 0), [0.13, 0.1, 0.59]);
+    }
+    mesh(site, box, 0x614a46, vec(0, 1.33, 0), [0.7, 0.15, 0.24]);
+    mesh(head, box, 0xe9b476, vec(0, 0.85, 0.07), [0.56, 0.16, 0.25]);
+    mesh(head, cylinder, 0xcfd2c7, vec(0, 0.43, 0.07), [0.045, 0.86, 0.045]);
+    mesh(site, box, 0x644c48, vec(0, 0.07, 0), [0.48, 0.14, 0.5]);
+    return (time) => {
+      head.position.y = Math.sin(time * 2.4) * 0.19;
+    };
+  }
   if (index === 7) {
     const metal = 0x56869a;
     for (const x of [-0.36, 0.36])
@@ -694,7 +738,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
   const fire = hearth(hub, mist);
   const lanterns = [];
   for (let i = 0; i < 8; i++) {
-    const a = (i * tau) / 8 + Math.PI / 8;
+    const a = (i * tau) / 8;
     const post = polar(1.23, a, 0.28);
     mesh(hub, cylinder, 0x695344, post, [0.033, 0.56, 0.033]);
     const lamp = new T.MeshStandardMaterial({
@@ -851,7 +895,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       );
       actor.root.scale.setScalar(0.72);
       const sleep = new T.Sprite(sleepMaterial);
-      sleep.position.set(0, 0.58, 0.32);
+      sleep.position.set(0, 0.48, -0.37);
       sleep.scale.set(0.56, 0.28, 1);
       actor.root.add(sleep);
       const cargo = fuel(actor.upper, vec(0, 0.26, 0.23), i);
@@ -925,7 +969,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
 
   function rest(worker) {
     worker.actor.root.position.copy(worker.home);
-    worker.actor.pose.rotation.x = worker.checked ? 0 : Math.PI / 2;
+    worker.actor.pose.rotation.x = worker.checked ? 0 : -Math.PI / 2;
     worker.actor.pose.position.y = worker.checked ? 0 : 0.13;
     worker.sleep.visible = !worker.checked;
     worker.actor.upper.position.y = 0;
@@ -988,10 +1032,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     pieces: [],
     centers,
     pickables,
-    labelPoints: [
-      ...centers.map((point) => point.clone().setY(1.15)),
-      vec(0, 1.3, 0),
-    ],
+    labelPoints: centers.map((point) => point.clone().setY(1.15)),
     dispose() {
       sleepMaterial.map.dispose();
     },

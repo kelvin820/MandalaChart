@@ -184,18 +184,21 @@ const pillarButtons = data.pillars.map((pillar, index) => {
 });
 $("#pillars").replaceChildren(...pillarButtons);
 
-const labels = [...data.pillars.map((pillar) => pillar.name), "CORE 目標"].map(
-  (name, index) => {
+const labels = data.pillars
+  .map((pillar) => pillar.name)
+  .map((name, index) => {
     const label = document.createElement("button");
     label.type = "button";
     const number = document.createElement("small");
-    number.textContent = index === 8 ? "✦" : String(index + 1).padStart(2, "0");
+    number.textContent = String(index + 1).padStart(2, "0");
     const title = document.createElement("span");
     title.textContent = name;
     title.title = name;
     label.append(number, title);
-    label.onclick = () =>
-      index === 8 ? stage?.focusIsland(-1) : choose(index, true);
+    label.onclick = () => {
+      setGoalList(true);
+      choose(index, true);
+    };
     label.onpointerenter = () => {
       hoveredIsland = index;
       updateLabels();
@@ -205,8 +208,7 @@ const labels = [...data.pillars.map((pillar) => pillar.name), "CORE 目標"].map
       updateLabels();
     };
     return label;
-  },
-);
+  });
 $("#islandLabels").replaceChildren(...labels);
 
 function updateLabels() {
@@ -397,13 +399,15 @@ $("#daylight").addEventListener("click", (event) => {
   stage?.setTime(button.dataset.time);
 });
 $("#islandOverview").onclick = () => stage?.focusIsland(-1);
-$("#toggleGoals").onclick = (event) => {
+function setGoalList(open) {
   const list = $("#goalList");
-  list.hidden = !list.hidden;
-  $(".workspace").classList.toggle("goals-hidden", list.hidden);
-  event.currentTarget.textContent = list.hidden ? "顯示清單" : "收起清單";
-  event.currentTarget.setAttribute("aria-expanded", String(!list.hidden));
-};
+  const button = $("#toggleGoals");
+  list.hidden = !open;
+  $(".workspace").classList.toggle("goals-hidden", !open);
+  button.textContent = open ? "收起清單" : "顯示清單";
+  button.setAttribute("aria-expanded", String(open));
+}
+$("#toggleGoals").onclick = () => setGoalList($("#goalList").hidden);
 $("#toggleLabels").onclick = (event) => {
   showLabels = !showLabels;
   hoveredIsland = -1;
