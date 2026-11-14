@@ -30,6 +30,25 @@ header {
   padding: 10px max(4%, calc((100vw - 1370px) / 2));
   border-bottom: 1px solid var(--border);
 }
+.world-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.world-navigation a {
+  color: var(--heading);
+  text-decoration: none;
+  padding: 6px 2px;
+}
+.world-navigation a:hover {
+  text-decoration: underline;
+}
+.world-status {
+  margin: 0 0 10px;
+  color: var(--amber);
+}
 .brand {
   display: flex;
   align-items: center;
@@ -71,6 +90,45 @@ main {
 }
 .workspace.goals-hidden .viewport {
   min-height: max(530px, 78vh);
+}
+body.personal-world {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.personal-world header {
+  padding: 8px clamp(12px, 2vw, 28px);
+  gap: 12px;
+}
+.personal-world main {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.personal-world .workspace {
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) clamp(270px, 24vw, 365px);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.personal-world .workspace.goals-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+.personal-world .workspace .viewport {
+  min-height: min(450px, 75dvh);
+}
+.personal-world .workspace > aside {
+  max-height: calc(100dvh - 65px);
+  overflow-y: auto;
+  border-inline-start: 1px solid var(--border);
+}
+.personal-world .world-status {
+  padding: 8px 16px 0;
 }
 #toggleGoals {
   position: absolute;
@@ -255,6 +313,12 @@ aside {
   font-size: 12px;
   background: var(--surface-raised);
 }
+#pillars button small {
+  display: block;
+  color: var(--dim);
+  font-size: 9px;
+  white-space: nowrap;
+}
 #pillars button[aria-pressed="true"] {
   color: var(--amber);
   background: var(--amber-soft);
@@ -351,6 +415,18 @@ dialog::backdrop {
   }
   .viewport {
     min-height: 500px;
+  }
+  .personal-world .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .personal-world .workspace.goals-hidden {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .personal-world .workspace > aside {
+    max-height: 45dvh;
+    border-inline-start: 0;
+    border-top: 1px solid var(--border);
   }
   .scene-title,
   .goal-label {
@@ -511,6 +587,11 @@ dialog::backdrop {
 }
 #islandLabels button small {
   color: #855337;
+}
+#islandLabels button .island-progress {
+  font-variant-numeric: tabular-nums;
+  border-inline-start: 1px solid currentColor;
+  padding-inline-start: 4px;
 }
 #islandLabels button:hover,
 #islandLabels button.active {

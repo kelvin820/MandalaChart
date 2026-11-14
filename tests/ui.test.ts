@@ -194,11 +194,9 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
   }
   assert.match(q(".structure-progress").textContent, /已確認 8 \/ 8/);
   assert.equal(q('[data-action="worlds"]').disabled, false);
+  const destinations: string[] = [];
+  w.location.assign = (url) => { destinations.push(String(url)); };
   await click("worlds");
-  assert.match(q(".world-frame").src, /\/worlds\//);
-  assert.equal(
-    JSON.parse(w.sessionStorage.getItem("mandala-world-view")!).pillars.length,
-    8,
-  );
+  assert.deepEqual(destinations, ["/worlds/?chart=" + charts[1].id]);
   w.happyDOM.abort();
 });

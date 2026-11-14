@@ -1,7 +1,10 @@
 import { mountStage } from "./stage.js";
 import { workshops, woods } from "./timber-islands.js";
+import { chartSchema } from "../domain.ts";
 
 const $ = (selector) => document.querySelector(selector);
+const chartId = new URLSearchParams(location.search).get("chart");
+let chart = null;
 const colors = [
   "#7e8eb5",
   "#bf9b6a",
@@ -111,32 +114,59 @@ const seed = {
     checked: Array(8).fill(false),
   })),
 };
-function readWorld() {
-  try {
-    const saved = JSON.parse(sessionStorage.getItem("mandala-world-view"));
-    if (
-      window.parent !== window &&
-      typeof saved?.chartId === "string" &&
-      typeof saved.goal === "string" &&
-      Array.isArray(saved.pillars) &&
-      saved.pillars.length === 8 &&
-      saved.pillars.every(
-        (pillar) =>
-          typeof pillar.name === "string" &&
-          pillar.actions?.length === 8 &&
-          pillar.actions.every((action) => typeof action === "string") &&
-          Array.isArray(pillar.checked) &&
-          pillar.checked.length === 8,
-      )
-    )
-      return saved;
-  } catch {
-    // The standalone page can be opened without a saved chart.
-  }
-  return seed;
+async function chartRequest(url, options) {
+  const response = await fetch(url, options);
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.chart)
+    throw new Error(result?.error || "目前無法讀取或儲存曼陀羅表。");
+  return chartSchema.parse(result.chart);
 }
 
-const data = readWorld();
+async function readWorld() {
+  if (chartId === null) return seed;
+  const back = $("#backToChart");
+  back.hidden = false;
+  const status = $("#worldStatus");
+  const workspace = $(".workspace");
+  workspace.hidden = true;
+  status.hidden = false;
+  status.textContent = "正在載入你的願望浮島…";
+  try {
+    if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(chartId))
+      throw new Error("找不到指定的曼陀羅表。");
+    back.href = "/#" + chartId;
+    const saved = await chartRequest("/api/charts/" + chartId, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (
+      saved.stale.length ||
+      saved.subGoals.some((_, i) => !saved.expansions[i])
+    )
+      throw new Error("請先回曼陀羅表，完成八個支柱的拆解與檢查。");
+    chart = saved;
+    document.body.classList.add("personal-world");
+    status.hidden = true;
+    workspace.hidden = false;
+    return {
+      goal: saved.goal,
+      pillars: saved.subGoals.map((p, i) => ({
+        name: p.title,
+        actions: saved.expansions[i].map((a) => a.title),
+        checked: saved.expansions[i].map(
+          (_, j) => !!saved.doneActions[i + ":" + j],
+        ),
+      })),
+    };
+  } catch (error) {
+    status.textContent =
+      error instanceof TypeError || error.name === "TimeoutError"
+        ? "目前無法載入願望浮島，請重新整理後再試。"
+        : error.message;
+    return null;
+  }
+}
+
+const data = await readWorld();
 
 let stage;
 let selected = 0;
@@ -146,21 +176,23 @@ const canvas = $("#scene");
 let showLabels = true;
 let hoveredIsland = -1;
 let labelPositions = [];
-$("#goal").textContent = data.goal;
-$("#goal").title = data.goal;
+if (data) {
+  $("#goal").textContent = data.goal;
+  $("#goal").title = data.goal;
+}
 $("#sample").hidden = data !== seed;
 
-const pillarButtons = data.pillars.map((pillar, index) => {
+const pillarButtons = (data?.pillars ?? []).map((pillar, index) => {
   const button = document.createElement("button");
-  button.textContent = String(index + 1);
-  button.setAttribute("aria-label", pillar.name);
-  button.title = pillar.name;
+  button.type = "button";
+  const progress = document.createElement("small");
+  button.append(String(index + 1), progress);
   button.onclick = () => choose(index, true);
   return button;
 });
 $("#pillars").replaceChildren(...pillarButtons);
 
-const labels = data.pillars
+const labels = (data?.pillars ?? [])
   .map((pillar) => pillar.name)
   .map((name, index) => {
     const label = document.createElement("button");
@@ -170,7 +202,9 @@ const labels = data.pillars
     const title = document.createElement("span");
     title.textContent = name;
     title.title = name;
-    label.append(number, title);
+    const progress = document.createElement("small");
+    progress.className = "island-progress";
+    label.append(number, title, progress);
     label.onclick = () => {
       setGoalList(true);
       choose(index, true);
@@ -239,14 +273,21 @@ function choose(index, focus = false) {
 }
 
 function updateProgress() {
-  const done = data.pillars.reduce(
-    (total, pillar) => total + pillar.checked.filter(Boolean).length,
-    0,
-  );
+  const counts = data.pillars.map((pillar, i) => {
+    const count = pillar.checked.filter(Boolean).length;
+    const description = `${pillar.name}，已完成 ${count} / 8 項行動`;
+    for (const button of [pillarButtons[i], labels[i]]) {
+      button.lastElementChild.textContent = count + "/8";
+      button.setAttribute("aria-label", description);
+      button.title = description;
+    }
+    return count;
+  });
+  const done = counts.reduce((total, count) => total + count, 0);
   $("#crystalCount").textContent = "全表完成 " + done + " / 64";
   $("#crystalProgress").value = done;
   const [place, fuel, unit] = workshops[selected];
-  const amount = data.pillars[selected].checked.filter(Boolean).length;
+  const amount = counts[selected];
   $("#islandWood").textContent =
     place +
     (woods[selected] ? " · " + woods[selected] : "") +
@@ -257,31 +298,17 @@ function updateProgress() {
   $("#chosen").textContent = "本支柱 " + amount + " / 8";
 }
 
-function saveCheck(pillar, action, done) {
-  if (data === seed) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const channel = new MessageChannel();
-    const timer = setTimeout(() => {
-      channel.port1.close();
-      reject(new Error("儲存未回應，請重新開啟 3D 檢視確認進度。"));
-    }, 20000);
-    channel.port1.onmessage = ({ data: result }) => {
-      clearTimeout(timer);
-      channel.port1.close();
-      if (result.ok) resolve();
-      else reject(new Error(result.message));
-    };
-    window.parent.postMessage(
-      {
-        type: "mandala:check-action",
-        chartId: data.chartId,
-        pillar,
-        action,
-        done,
-      },
-      location.origin,
-      [channel.port2],
-    );
+async function saveCheck(pillar, action, done) {
+  if (!chart) return;
+  const updated = structuredClone(chart);
+  const key = pillar + ":" + action;
+  if (done) updated.doneActions[key] = true;
+  else delete updated.doneActions[key];
+  chart = await chartRequest("/api/charts", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chart: updated, expected: chart.revision }),
+    signal: AbortSignal.timeout(20_000),
   });
 }
 
@@ -302,7 +329,10 @@ async function updateCheck(pillar, action, check) {
     status.textContent = data === seed ? "" : "已儲存";
   } catch (error) {
     check.checked = data.pillars[pillar].checked[action];
-    status.textContent = error.message;
+    status.textContent =
+      error.name === "TimeoutError"
+        ? "儲存逾時，請重新整理確認進度。"
+        : error.message;
   } finally {
     saving = false;
     $("#actions").inert = false;
@@ -367,36 +397,64 @@ $("#toggleLabels").onclick = (event) => {
   updateLabels();
 };
 
-choose(0);
-try {
-  stage = mountStage(canvas, {
-    pillars: data.pillars,
-    onPillar: (index) =>
-      index === 8 ? stage?.focusIsland(-1) : choose(index, true),
-    onLabels: (positions) => {
-      labelPositions = positions;
-      updateLabels();
-    },
-    onHover: (index) => {
-      hoveredIsland = index;
-      updateLabels();
-    },
-    onDelivery: (message) => {
-      $("#delivery").textContent = message;
-    },
-    onUnavailable: unavailable,
+if (data) startWorld();
+
+function startWorld() {
+  choose(0);
+  try {
+    stage = mountStage(canvas, {
+      pillars: data.pillars,
+      onPillar: (index) =>
+        index === 8 ? stage?.focusIsland(-1) : choose(index, true),
+      onLabels: (positions) => {
+        labelPositions = positions;
+        updateLabels();
+      },
+      onHover: (index) => {
+        hoveredIsland = index;
+        updateLabels();
+      },
+      onDelivery: (message) => {
+        $("#delivery").textContent = message;
+      },
+      onUnavailable: unavailable,
+    });
+  } catch (error) {
+    console.warn("Mandala scene could not start", error);
+  }
+  if (stage) {
+    $(".island-tools").hidden = false;
+    $("#islandLabels").hidden = false;
+  } else unavailable();
+  syncRotation();
+  window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) stage?.dispose();
   });
-} catch (error) {
-  console.warn("Mandala scene could not start", error);
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && chart) location.reload();
+  });
+
+  const fullscreen = $("#fullscreen");
+  if (document.fullscreenEnabled) {
+    fullscreen.hidden = false;
+    document.addEventListener("fullscreenchange", () => {
+      const isFullscreen = !!document.fullscreenElement;
+      fullscreen.textContent = isFullscreen ? "離開全螢幕" : "全螢幕";
+      fullscreen.setAttribute("aria-pressed", String(isFullscreen));
+    });
+    fullscreen.onclick = async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+        $("#worldStatus").hidden = true;
+      } catch {
+        const status = $("#worldStatus");
+        status.textContent = "無法切換全螢幕，請使用瀏覽器的全螢幕功能。";
+        status.hidden = false;
+      }
+    };
+  }
 }
-if (stage) {
-  $(".island-tools").hidden = false;
-  $("#islandLabels").hidden = false;
-} else unavailable();
-syncRotation();
-window.addEventListener("pagehide", (event) => {
-  if (!event.persisted) stage?.dispose();
-});
 
 function escapeXML(s) {
   return String(s).replace(
@@ -426,7 +484,10 @@ function svgChart() {
   cells[4][4] = { text: data.goal, c: "#304636", dark: true };
   pos.forEach(([x, y], i) => {
     cells[3 + y][3 + x] = { text: data.pillars[i].name, c: colors[i] };
-    cells[y * 3 + 1][x * 3 + 1] = { text: data.pillars[i].name, c: colors[i] };
+    cells[y * 3 + 1][x * 3 + 1] = {
+      text: data.pillars[i].name,
+      c: colors[i],
+    };
     pos.forEach(([ax, ay], j) => {
       cells[y * 3 + ay][x * 3 + ax] = {
         text: data.pillars[i].actions[j],
@@ -462,7 +523,9 @@ $("#export").onclick = () => {
 };
 $("#closeDialog").onclick = () => $("#exportDialog").close();
 $("#download").onclick = () => {
-  const blob = new Blob([svgChart()], { type: "image/svg+xml;charset=utf-8" }),
+  const blob = new Blob([svgChart()], {
+      type: "image/svg+xml;charset=utf-8",
+    }),
     url = URL.createObjectURL(blob),
     a = document.createElement("a");
   a.href = url;

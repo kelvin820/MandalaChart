@@ -880,53 +880,8 @@ function openWorlds() {
     toast("先完成八個支柱的拆解與檢查，再看立體成果。");
     return;
   }
-  sessionStorage.setItem(
-    "mandala-world-view",
-    JSON.stringify({
-      chartId: c.id,
-      goal: c.goal,
-      pillars: c.subGoals.map((p, i) => ({
-        name: p.title,
-        actions: c.expansions[i].map((a) => a.title),
-        checked: c.expansions[i].map((_, j) => !!c.doneActions[i + ":" + j]),
-      })),
-    }),
-  );
-  show(
-    modal(
-      "你的小行動，已經形成一個有方向的世界。",
-      '<p>勾選做過的行動，讓島上的工人為希望火炬送燃料。進度會同步儲存到這張表。</p><iframe title="我的願望浮島" class="world-frame" src="/worlds/"></iframe>',
-    ),
-    "world-dialog",
-  );
+  location.assign("/worlds/?chart=" + encodeURIComponent(c.id));
 }
-window.addEventListener("message", async (event) => {
-  const frame = dialog.querySelector<HTMLIFrameElement>(".world-frame");
-  const request = event.data;
-  const reply = event.ports[0];
-  if (!dialog.open || !frame || event.source !== frame.contentWindow ||
-      event.origin !== location.origin || request?.type !== "mandala:check-action" || !reply) return;
-  try {
-    const chart = current;
-    const { chartId, pillar, action, done } = request;
-    if (!chart || chart.id !== chartId || typeof done !== "boolean" ||
-        !Number.isInteger(pillar) || !Number.isInteger(action) ||
-        !chart.expansions[pillar]?.[action] || chart.stale.includes(pillar)) {
-      throw Error("這項行動已變更，請重新開啟 3D 檢視。");
-    }
-    const updated = structuredClone(chart);
-    const key = pillar + ":" + action;
-    if (done) updated.doneActions[key] = true;
-    else delete updated.doneActions[key];
-    await saveChart(updated);
-    if (current?.id === chart.id) renderChart();
-    reply.postMessage({ ok: true });
-  } catch (error) {
-    reply.postMessage({ ok: false, message: (error as Error).message || "儲存未完成，請再試一次。" });
-  } finally {
-    reply.close();
-  }
-});
 function migrateImported(raw: any): Chart {
   const m = structuredClone(raw);
   m.id =
@@ -1317,8 +1272,8 @@ dialog.addEventListener("cancel", () => {
     candidate = null;
   }
 });
-dialog.addEventListener("close", () => {
-  if (!dialog.open) dialog.querySelector(".world-frame")?.remove();
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted && location.hash) void load();
 });
 window.addEventListener("hashchange", () => {
   const id = location.hash.slice(1);

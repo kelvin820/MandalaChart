@@ -25,10 +25,15 @@
         />
         <span>願望之境<small>WISHLANDS</small></span>
       </div>
-      <button id="export" hidden>↗ 匯出曼陀羅表</button>
+      <div class="world-navigation">
+        <button type="button" id="fullscreen" aria-pressed="false" hidden>全螢幕</button>
+        <a id="backToChart" href="/" hidden>← 返回曼陀羅表</a>
+        <button id="export" hidden>↗ 匯出曼陀羅表</button>
+      </div>
     </header>
     <main>
       <p id="sample" class="sample" hidden>範例目標 · 可試用行動勾選</p>
+      <p id="worldStatus" class="world-status" role="status" hidden></p>
       <div class="workspace">
         <section class="viewport" data-time="night" aria-labelledby="sceneName">
           <div class="scene-title">
@@ -92,7 +97,7 @@
           <div class="aside-top">
             <span>探索支柱</span><span id="pillarNumber">1 / 8</span>
           </div>
-          <div id="pillars" aria-label="八個支柱"></div>
+          <div id="pillars" aria-label="八個支柱與完成數"></div>
           <h3 id="pillarName"></h3>
           <p id="islandWood"></p>
           <ol id="actions" aria-labelledby="pillarName"></ol>
