@@ -8,7 +8,7 @@ import {
   type Chart,
   type Generation,
 } from "../src/domain.ts";
-import { completeStructured, type ModelEnv } from "./llm.ts";
+import { completeStructured, modelConfig, NvidiaGenerationError, type ModelEnv } from "./llm.ts";
 export type Job = {
   requestId: string;
   state: "pending" | "succeeded" | "failed";
@@ -73,11 +73,14 @@ export async function api(
       const result = await chartFile(request, c, exportMatch[2], owner, files);
       return result ?? json({ error: "不支援這個匯出操作。" }, 405);
     }
-    if (path === "/api/config")
+    if (path === "/api/config") {
+      const config = modelConfig(env);
       return json({
-        modelReady: !!(env.OPENAI_API_KEY && env.OPENAI_MODEL),
+        modelReady: !!config,
+        provider: config?.provider ?? null,
         storage: "cloud",
       });
+    }
     if (path === "/api/charts" && request.method === "GET")
       return json({ charts: await store.list(owner) });
     if (path === "/api/charts" && request.method === "PUT") {
@@ -143,7 +146,7 @@ export async function api(
       const input = generationSchema.parse(await boundedBody(request));
       const known = await store.job(owner, input.requestId);
       if (known) return json(known, known.state === "pending" ? 202 : 200);
-      if (!env.OPENAI_API_KEY || !env.OPENAI_MODEL)
+      if (!modelConfig(env))
         return json(
           {
             error:
@@ -170,10 +173,12 @@ export async function api(
           await generate(input, env),
         );
         job.state = "succeeded";
-      } catch {
+      } catch (error) {
         job.state = "failed";
         job.error =
-          "模型生成失敗或逾時，原內容沒有被替換。請稍後重試，或檢查後端模型設定。";
+          error instanceof NvidiaGenerationError
+            ? error.message
+            : "模型生成失敗或逾時，原內容沒有被替換。請稍後重試，或檢查後端模型設定。";
       }
       await store.finish(owner, job);
       return json(job);

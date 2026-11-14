@@ -77,7 +77,7 @@ async function load() {
     ready = config.modelReady;
     charts = list.charts;
     $("#connection").textContent = ready
-      ? "AI 已設定"
+      ? config.provider === "nvidia" ? "NVIDIA AI 已設定" : "AI 已設定"
       : "AI 尚待連線";
     loadError = "";
   } catch (e) {

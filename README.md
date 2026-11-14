@@ -12,15 +12,15 @@
 - 編輯上層保留下層並標示待檢查；改原子內容會重設該項檢核。
 - 原子能力有可觀察的驗證標準；持續習慣的勾選代表本次檢核。
 - JSON 備份與匯入、舊版完整 getMandala JSON 匯入、SVG 與直接下載 PDF。
-- OpenAI 尚未設定時明確提示；示範資料與外部模型匯入不假裝是 AI 生成。
+- AI 尚未設定時會顯示提示。範例資料和外部模型匯入各有自己的操作入口。
 
 ## 實作選擇
 
-採用 TypeScript、原生 DOM 元件、Zod、Vercel AI SDK 的 OpenAI provider、SQLite 相容儲存與 Three.js。首頁與 3D 成果共用渲染模組，編輯區的支柱進度由已確認的資料驅動。
+採用 TypeScript、原生 DOM 元件、Zod、SQLite 相容儲存與 Three.js。模型支援 NVIDIA NIM 和 OpenAI。首頁與 3D 成果共用渲染模組，編輯區的支柱進度由已確認的資料驅動。
 
 - `src/domain.ts`：資料 schema、兩層 Prompt、候選採用規則。
 - `src/app.ts`：首頁、九宮格、編輯、Prompt、比較採用、備份。
-- `server/llm.ts`：唯一模型呼叫層，使用安裝版本的 generateText + Output.object，並再次驗證八項輸出。
+- `server/llm.ts`：使用 NVIDIA Chat Completions 或 OpenAI Responses 生成結構化資料，並驗證八項輸出。
 - `server/api.ts`：驗證、使用者權限、生成請求冪等、版本檢查。
 - `server/store.ts`：D1 持久化，資料以使用者 ID 隔離。
 - `server/worker.ts`：Sites Cloudflare Worker，靜態資源隨 Worker 內嵌。
@@ -35,18 +35,22 @@
 ```sh
 npm ci --cache /tmp/mandala-npm-cache
 cp .env.example .env
-# 在本機 .env 安全設定 OPENAI_API_KEY 與 OPENAI_MODEL
+# 在本機 .env 設定 NVIDIA_API_KEY，或設定 OPENAI_API_KEY 與 OPENAI_MODEL
 npm run build
 npm start
 ```
 
 開啟 http://127.0.0.1:3000 。本機資料放在忽略追蹤的 `work/mandala.sqlite`，本機以 local-owner 作為使用者，僅供單人開發。沒有模型設定也可試用範例、編輯、備份與匯入外部模型的 JSON。
 
-模型名稱沒有硬編碼，必須設定目前帳戶可用、支援 Structured Outputs 的模型。金鑰僅留在後端，不接受前端傳入。Hosted Sites 由安全金鑰設定流程提供環境變數，不要將 .env 提交。
+設定 `NVIDIA_API_KEY`（或 `NGC_API_KEY`）後會使用 NVIDIA。預設模型是 `nvidia/nemotron-3.5-super-vl-120b-a12b`，可用 `NVIDIA_MODEL` 指定支援 JSON Schema 的模型。未設定 NVIDIA 金鑰時，會使用已設定的 OpenAI 金鑰與模型。金鑰留在後端，`.env` 已被 Git 忽略。
+
+可執行 `node --env-file-if-exists=.env scripts/check-nvidia.mjs`，用範例目標測試 NVIDIA 的兩層生成。
 
 ## 部署
 
 沿用既有私人 Sites 身分與權限。`.openai/hosting.json` 宣告 DB；建置輸出 `dist/server/index.js` 與 `.openai/hosting.json`，並把 schema 遷移包含在發布封裝。Hosted 資料使用 Sites D1，使用者身分由平台 `oai-authenticated-user-id` 提供。沒有身分的 API 請求一律拒絕。
+
+要在 Sites 啟用 NVIDIA，需在站點的後端環境變數加入秘密值 `NVIDIA_API_KEY`，再部署新版。本機 `.env` 只供本機服務使用。
 
 ## 檢查
 
@@ -57,11 +61,10 @@ npm test
 npm run build
 ```
 
-測試使用真正的 SQLite 儲存 adapter 驗證資料隔離、版本衝突、生成冪等、限流與候選不直接覆寫。模型以注入函式模擬，不會產生 OpenAI 費用；這些測試不代表真實模型品質驗證。
+測試使用 SQLite 驗證資料隔離、版本衝突、生成冪等、限流與候選不直接覆寫。自動化測試使用模擬模型回覆。
 
 ## 範圍與限制
 
-- OpenAI 實際生成需完成安全金鑰設定後，才能驗證延遲與輸出品質。
 - 每個使用者每分鐘六次、每日六十次生成的基本限流；公開商用前仍須依產品政策設定成本預算、用量與營運監控。
 - 本次檢核不包含排程、提醒或習慣的歷史打卡。
 - 請求識別碼與結果存入資料庫，連線失去回應時會用同一識別碼查詢，不以相同目標文字猜測配對。這不是耐久背景佇列；Worker 在中斷後可能無法完成模型請求，逾時會保留舊內容並允許重試。
