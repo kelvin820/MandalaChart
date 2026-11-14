@@ -913,19 +913,55 @@ details.context .context-fields {
 .local-context input {
   font-size: 12px;
 }
-.detail {
+.atom-panel {
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-active);
   border-radius: 12px;
-  padding: 24px;
+  box-shadow: 0 12px 32px #060810a8;
+  overflow-wrap: anywhere;
 }
-.detail h3 {
-  font-size: 20px;
+.atom-panel[hidden] {
+  display: none;
 }
-.detail p {
+.atom-panel-heading {
+  position: relative;
+  padding: 14px 48px 0 15px;
+}
+.atom-panel-heading h3 {
+  margin: 8px 0 10px;
+  font-size: 17px;
+  line-height: 1.5;
+}
+.atom-panel-close {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  font-size: 19px;
+}
+.atom-panel-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 15px 10px;
+}
+.atom-panel-body h4 {
+  margin: 0 0 3px;
+  font-size: 12px;
+  font-family: inherit;
+}
+.atom-panel-body p {
+  margin: 0;
   font-size: 13px;
-  color: var(--dim);
-  line-height: 1.9;
+  line-height: 1.75;
+  white-space: pre-wrap;
 }
 .criterion {
   padding: 12px 15px;
@@ -942,9 +978,22 @@ details.context .context-fields {
   color: var(--heading);
   margin-bottom: 3px;
 }
-.detail .buttons {
+.atom-panel-body .criterion {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  white-space: pre-wrap;
+}
+.atom-panel-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+}
+.atom-panel-actions button {
+  flex: 1 1 auto;
+  padding: 6px 8px;
+  font-size: 12px;
 }
 .stale-warning {
   background: var(--amber-soft);
@@ -1565,11 +1614,19 @@ dialog::backdrop {
     font-size: 10px;
     padding: 6px 8px;
   }
-  .detail {
-    padding: 19px;
+  body:has(.atom-panel:not([hidden])) {
+    padding-bottom: 48dvh;
   }
-  .detail p {
-    font-size: 12px;
+  body:has(.atom-panel:not([hidden])) #toast {
+    bottom: calc(48dvh + max(20px, env(safe-area-inset-bottom)));
+  }
+  .atom-panel {
+    inset: auto 12px max(12px, env(safe-area-inset-bottom));
+    width: auto;
+    max-height: 48dvh;
+  }
+  .atom-panel-heading h3 {
+    font-size: 16px;
   }
   .world-frame {
     height: 80vh;

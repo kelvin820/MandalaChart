@@ -40,7 +40,7 @@ const POS = [0, 1, 2, 3, -1, 4, 5, 6, 7],
 let charts: Chart[] = [],
   current: Chart | null = null,
   selected: number | null = null,
-  actionIndex = 0,
+  actionIndex: number | null = null,
   ready = false,
   loadError = "",
   draft = { goal: "", deadline: "", currentState: "", constraints: "" },
@@ -228,18 +228,66 @@ function renderBranch() {
   const center = atoms
     ? `<button type="button" class="cell center" data-action="collapse"><small>行動支柱</small><strong>${escape(p.title)}</strong><small class="center-return">← 返回終極目標</small></button>`
     : `<button type="button" class="cell center" data-action="expand"><small>PILLAR 0${i + 1}</small><strong>${escape(p.title)}</strong><small>展開八項行動 ↗</small></button>`;
-  const grid = atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? center : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-pressed="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div>` : `<div class="grid" aria-label="尚未展開的行動九宮格">${POS.map((j) => j === -1 ? center : '<div class="cell empty-atom" aria-hidden="true"></div>').join("")}</div>`;
+  const grid = atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? center : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-controls="atomDetail" aria-expanded="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div>` : `<div class="grid" aria-label="尚未展開的行動九宮格">${POS.map((j) => j === -1 ? center : '<div class="cell empty-atom" aria-hidden="true"></div>').join("")}</div>`;
   const mini = `<button class="overview-mini" data-action="collapse" aria-label="返回第一層曼陀羅九宮格"><span class="mini-grid" aria-hidden="true">${POS.map((j) => `<i class="${j === i ? "mini-active" : j === -1 ? "mini-center" : ""}"></i>`).join("")}</span><span>返回總覽</span></button>`;
-  el.innerHTML = `<section class="branch" id="branch"><div class="branch-board">${grid}<div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div></div>${atoms ? '<div id="atomDetail"></div>' : ""}<div class="branch-head"><div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">重新生成此支柱</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}</section>`;
+  el.innerHTML = `<section class="branch" id="branch"><div class="branch-board">${grid}<div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div></div>${atoms ? '<aside id="atomDetail" class="atom-panel" aria-labelledby="atomDetailTitle" hidden></aside>' : ""}<div class="branch-head"><div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">重新生成此支柱</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}</section>`;
   if (atoms) renderAtom();
 }
+
+function positionAtomDetail() {
+  const panel = document.querySelector<HTMLElement>("#atomDetail:not([hidden])");
+  if (!panel) return;
+  if (matchMedia("(max-width: 760px)").matches) {
+    panel.removeAttribute("style");
+    return;
+  }
+  const rail = $(".chart-aside").getBoundingClientRect();
+  const cell = $(".branch-board .cell.selected").getBoundingClientRect();
+  const bottom = document.documentElement.clientHeight - 16;
+  panel.style.left = `${rail.left}px`;
+  panel.style.width = `${rail.width}px`;
+  panel.style.top = `${Math.max(16, Math.min(cell.top, bottom - panel.offsetHeight))}px`;
+}
+
 function renderAtom() {
-  const i = selected!,
-    c = current!,
-    a = c.expansions[i][actionIndex],
-    done = c.doneActions[i + ":" + actionIndex];
-  $("#atomDetail").innerHTML =
-    `<div class="detail"><span class="badge">${a.kind === "capability" ? "原子能力 · 可展示與驗證" : "原子行動 · 可執行與檢核"}</span><h3 style="margin-top:12px">${escape(a.title)}</h3><p>${escape(a.detail)}</p><div class="criterion"><b>${a.kind === "capability" ? "如何驗證這個能力" : "怎樣算完成這次檢核"}</b>${escape(a.criterion)}</div><div class="buttons"><button data-action="toggleDone" class="${done ? "" : "amber"}" aria-pressed="${!!done}">${done ? "取消這次檢核" : "✓ 標記這次檢核完成"}</button><button data-action="editAtom">編輯內容</button></div><p class="note" style="margin:13px 0 0">持續性習慣的勾選代表這次檢核，之後可取消並重新檢視。</p></div>`;
+  const panel = $("#atomDetail");
+  document.querySelectorAll<HTMLElement>("[data-action=selectAtom]").forEach((cell) => {
+    const active = Number(cell.dataset.index) === actionIndex;
+    cell.classList.toggle("selected", active);
+    cell.setAttribute("aria-expanded", String(active));
+  });
+  if (selected === null || actionIndex === null) {
+    panel.hidden = true;
+    panel.replaceChildren();
+    return;
+  }
+  const c = current!;
+  const atom = c.expansions[selected][actionIndex];
+  const done = !!c.doneActions[selected + ":" + actionIndex];
+  panel.innerHTML = `
+    <div class="atom-panel-heading">
+      <span class="badge">${atom.kind === "capability" ? "原子能力" : "原子行動"}</span>
+      <button type="button" class="atom-panel-close" data-action="closeAtom" aria-label="關閉行動詳情">×</button>
+      <h3 id="atomDetailTitle" tabindex="-1">${escape(atom.title)}</h3>
+    </div>
+    <div class="atom-panel-body">
+      <h4>具體做法</h4>
+      <p>${escape(atom.detail)}</p>
+      <div class="criterion"><b>${atom.kind === "capability" ? "驗證標準" : "完成標準"}</b>${escape(atom.criterion)}</div>
+    </div>
+    <div class="atom-panel-actions">
+      <button type="button" data-action="toggleDone" class="${done ? "" : "amber"}" aria-pressed="${done}">${done ? "取消完成標記" : "✓ 標記完成"}</button>
+      <button type="button" data-action="editAtom">編輯內容</button>
+    </div>`;
+  panel.hidden = false;
+  positionAtomDetail();
+}
+
+function closeAtomDetail() {
+  const cell = document.querySelector<HTMLElement>(".branch-board [data-action=selectAtom].selected");
+  actionIndex = null;
+  renderAtom();
+  cell?.focus({ preventScroll: true });
 }
 function show(html: string, cls = "") {
   dialog.className = cls;
@@ -279,7 +327,7 @@ function openChart(id: string) {
   wholeBoard = false;
   current = charts.find((c) => c.id === id) ?? null;
   selected = null;
-  actionIndex = 0;
+  actionIndex = null;
   history.replaceState(null, "", "#" + id);
   render();
   window.scrollTo({ top: 0, behavior: "instant" });
@@ -637,7 +685,7 @@ async function adopt() {
     current = saved;
     if (p.input.operation === "all") {
       selected = null;
-      actionIndex = 0;
+      actionIndex = null;
       wholeBoard = false;
     }
   } else {
@@ -683,8 +731,10 @@ async function adopt() {
 }
 function showEdit(kind: "meta" | "pillar" | "atom") {
   const c = current!,
+    editIndex = actionIndex,
     p = selected === null ? null : c.subGoals[selected],
-    a = selected === null ? null : c.expansions[selected]?.[actionIndex];
+    a = selected === null || editIndex === null ? null : c.expansions[selected]?.[editIndex];
+  if (kind === "atom" && !a) return;
   let body = "";
   if (kind === "meta")
     body = `<label class="field"><span class="label">終極目標</span><textarea id="editGoal" maxlength="200" required>${escape(c.goal)}</textarea></label>${contextFields("edit", c)}<p class="note">修改目標或整體條件後，已展開的行動會標示為待檢查，內容仍保留。</p>`;
@@ -729,23 +779,26 @@ function showEdit(kind: "meta" | "pillar" | "atom") {
       )
         copy.stale.push(selected!);
     }
-    if (kind === "atom") {
-      copy.expansions[selected!][actionIndex] = {
+    if (kind === "atom" && editIndex !== null) {
+      copy.expansions[selected!][editIndex] = {
         title: $<HTMLInputElement>("#editTitle").value.trim(),
         detail: $<HTMLTextAreaElement>("#editDetail").value.trim(),
         kind: $<HTMLSelectElement>("#editKind").value as Atom["kind"],
         criterion: $<HTMLTextAreaElement>("#editCriterion").value.trim(),
       };
       if (
-        JSON.stringify(copy.expansions[selected!][actionIndex]) !==
-        JSON.stringify(current!.expansions[selected!][actionIndex])
+        JSON.stringify(copy.expansions[selected!][editIndex]) !==
+        JSON.stringify(c.expansions[selected!][editIndex])
       )
-        delete copy.doneActions[selected! + ":" + actionIndex];
+        delete copy.doneActions[selected! + ":" + editIndex];
     }
     try {
       await saveChart(chartSchema.parse(copy));
       dialog.close();
       renderChart();
+      if (kind === "atom")
+        document.querySelector<HTMLElement>("#atomDetail [data-action=editAtom]")
+          ?.focus({ preventScroll: true });
       toast("修改已儲存。");
     } catch (e) {
       $("#editError").textContent = (e as Error).message;
@@ -913,7 +966,7 @@ function validateImportedCharts(raw: any) {
   return records.map(migrateImported);
 }
 let deleting = false;
-async function act(action: string, button: HTMLElement) {
+async function act(action: string, button: HTMLElement, keyboard = false) {
   if (action === "focusGoal") {
     $("#goalInput").focus();
     return;
@@ -965,7 +1018,7 @@ async function act(action: string, button: HTMLElement) {
   if (action === "selectPillar") {
     const from = $(".chart-layout .grid").getBoundingClientRect();
     selected = Number(button.dataset.index);
-    actionIndex = 0;
+    actionIndex = null;
     renderChart();
     const mini = $(".overview-mini");
     animateBoard(mini, from);
@@ -976,6 +1029,7 @@ async function act(action: string, button: HTMLElement) {
     const from = $(".overview-mini").getBoundingClientRect();
     const index = selected;
     selected = null;
+    actionIndex = null;
     renderChart();
     animateBoard($(".chart-layout .grid"), from);
     $(`[data-action="selectPillar"][data-index="${index}"]`).focus({ preventScroll: true });
@@ -983,11 +1037,12 @@ async function act(action: string, button: HTMLElement) {
   }
   if (action === "selectAtom") {
     actionIndex = Number(button.dataset.index);
-    document.querySelectorAll<HTMLElement>("[data-action=selectAtom]").forEach((cell) => {
-      cell.classList.toggle("selected", cell === button);
-      cell.setAttribute("aria-pressed", String(cell === button));
-    });
     renderAtom();
+    if (keyboard) $("#atomDetailTitle").focus({ preventScroll: true });
+    return;
+  }
+  if (action === "closeAtom") {
+    closeAtomDetail();
     return;
   }
   if (action === "editMeta") {
@@ -1044,13 +1099,20 @@ async function act(action: string, button: HTMLElement) {
     return;
   }
   if (action === "toggleDone") {
+    if (selected === null || actionIndex === null) return;
+    const wasFocused = document.activeElement === button;
     button.setAttribute("disabled", "");
     const c = structuredClone(current!),
       key = selected + ":" + actionIndex;
     c.doneActions[key] = !c.doneActions[key];
     try {
       await saveChart(c);
+      const restoreFocus = wasFocused && button.isConnected &&
+        (document.activeElement === button || document.activeElement === document.body);
       renderChart();
+      if (restoreFocus)
+        document.querySelector<HTMLElement>("#atomDetail [data-action=toggleDone]")
+          ?.focus({ preventScroll: true });
     } finally {
       button.removeAttribute("disabled");
     }
@@ -1233,7 +1295,7 @@ document.addEventListener("click", (e) => {
     "[data-action]",
   );
   if (!button || button.hasAttribute("disabled")) return;
-  void act(button.dataset.action!, button).catch((e) => {
+  void act(button.dataset.action!, button, e.detail === 0).catch((e) => {
     const msg = (e as Error).message || "操作未完成，請稍後重試。";
     toast(msg);
     if (dialog.open) {
@@ -1241,6 +1303,13 @@ document.addEventListener("click", (e) => {
       if (error) error.textContent = msg;
     }
   });
+});
+window.addEventListener("resize", positionAtomDetail);
+window.addEventListener("scroll", positionAtomDetail, { passive: true });
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || dialog.open || !document.querySelector("#atomDetail:not([hidden])")) return;
+  event.preventDefault();
+  closeAtomDetail();
 });
 dialog.addEventListener("cancel", () => {
   if (pending && !sessionStorage.getItem("mandala-pending")) {

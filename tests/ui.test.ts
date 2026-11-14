@@ -133,6 +133,14 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
   assert.equal(charts[0].expansions[0].length, 8);
   assert.equal(charts[0].pillarContexts[0].deadline, "兩個月");
   assert.equal(w.document.querySelectorAll(".structure-pillars .raised").length, 1);
+  assert.equal(q("#atomDetail").hidden, true);
+  q('[data-action="selectAtom"][data-index="1"]').click();
+  assert.equal(q("#atomDetailTitle").textContent, charts[0].expansions[0][1].title);
+  await click("closeAtom");
+  assert.equal(q("#atomDetail").hidden, true);
+  assert.equal(w.document.activeElement?.getAttribute("data-index"), "1");
+  await click("selectAtom");
+  assert.equal(q("#atomDetailTitle").textContent, charts[0].expansions[0][0].title);
   await click("toggleDone");
   assert.equal(charts[0].doneActions["0:0"], true);
   await click("editAtom");
@@ -142,6 +150,7 @@ test("DOM 流程：建立目標→Prompt→匯入候選→採用→展開→編�
   );
   await pause();
   assert.equal(charts[0].expansions[0][0].title, "每天練習日文五分鐘");
+  assert.equal(q("#atomDetailTitle").textContent, "每天練習日文五分鐘");
   assert.equal(charts[0].doneActions["0:0"], undefined);
   await click("editMeta");
   q("#editGoal").value = "新的日文旅行目標";
