@@ -219,22 +219,49 @@ const labels = (data?.pillars ?? [])
     };
     return label;
   });
-$("#islandLabels").replaceChildren(...labels);
+$("#islandLabels").append(...labels);
+const labelLines = labels.map(() => {
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  $("#islandLabelLines").append(line);
+  return line;
+});
 
 function updateLabels() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (!width || !height) return;
+  const gap = Math.min(42, width * 0.055);
+  const margin = Math.min(78, width * 0.14) / width * 100;
   labels.forEach((label, index) => {
-    const point = labelPositions[index];
+    const [shore, point] = labelPositions[index] ?? [];
     const inView =
       point?.[2] &&
       point[0] > 5 &&
       point[0] < 95 &&
-      point[1] > 25 &&
-      point[1] < 86;
+      point[1] > 12 &&
+      point[1] < 94;
     label.hidden = !inView || (!showLabels && hoveredIsland !== index);
+    const line = labelLines[index];
+    line.toggleAttribute("hidden", label.hidden);
     if (label.hidden) return;
-    label.style.left = point[0] + "%";
-    label.style.top = point[1] + "%";
+    const dx = (point[0] - shore[0]) * width;
+    const dy = (point[1] - shore[1]) * height;
+    const length = Math.hypot(dx, dy) || 1;
+    const x = Math.max(
+      margin,
+      Math.min(100 - margin, point[0] + (gap * dx * 100) / (length * width)),
+    );
+    const y = Math.max(
+      12,
+      Math.min(94, point[1] + (gap * dy * 100) / (length * height)),
+    );
+    label.style.left = x + "%";
+    label.style.top = y + "%";
     label.classList.toggle("active", index === selected);
+    line.setAttribute("x1", shore[0]);
+    line.setAttribute("y1", shore[1]);
+    line.setAttribute("x2", x);
+    line.setAttribute("y2", y);
   });
 }
 
@@ -436,16 +463,27 @@ function startWorld() {
 
   const fullscreen = $("#fullscreen");
   if (document.fullscreenEnabled) {
+    const exitFullscreen = $("#exitFullscreen");
+    let listWasOpen;
     fullscreen.hidden = false;
     document.addEventListener("fullscreenchange", () => {
-      const isFullscreen = !!document.fullscreenElement;
-      fullscreen.textContent = isFullscreen ? "離開全螢幕" : "全螢幕";
-      fullscreen.setAttribute("aria-pressed", String(isFullscreen));
+      const immersive = document.fullscreenElement === document.documentElement;
+      document.body.classList.toggle("world-immersive", immersive);
+      exitFullscreen.hidden = !immersive;
+      fullscreen.setAttribute("aria-pressed", String(immersive));
+      if (immersive) {
+        listWasOpen = !$("#goalList").hidden;
+        setGoalList(false);
+        exitFullscreen.focus({ preventScroll: true });
+      } else if (listWasOpen !== undefined) {
+        setGoalList(listWasOpen);
+        listWasOpen = undefined;
+        fullscreen.focus({ preventScroll: true });
+      }
     });
     fullscreen.onclick = async () => {
       try {
-        if (document.fullscreenElement) await document.exitFullscreen();
-        else await document.documentElement.requestFullscreen();
+        await document.documentElement.requestFullscreen();
         $("#worldStatus").hidden = true;
       } catch {
         const status = $("#worldStatus");
@@ -453,6 +491,7 @@ function startWorld() {
         status.hidden = false;
       }
     };
+    exitFullscreen.onclick = () => document.exitFullscreen();
   }
 }
 

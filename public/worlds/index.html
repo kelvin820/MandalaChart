@@ -41,7 +41,14 @@
             <p>勾選行動，讓島上的工坊持續為中央火炬送燃料。</p>
           </div>
           <canvas id="scene" aria-label="可拖曳旋轉的立體目標模型"></canvas>
-          <div id="islandLabels" hidden></div>
+          <div id="islandLabels" hidden>
+            <svg
+              id="islandLabelLines"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            ></svg>
+          </div>
           <div class="island-tools" hidden>
             <div id="daylight" role="group" aria-label="島嶼時段">
               <button type="button" data-time="dawn" aria-pressed="false">
@@ -62,14 +69,25 @@
               島嶼名牌
             </button>
           </div>
-          <button
-            type="button"
-            id="toggleGoals"
-            aria-controls="goalList"
-            aria-expanded="true"
-          >
-            收起清單
-          </button>
+          <div class="viewport-controls">
+            <button
+              type="button"
+              id="toggleGoals"
+              aria-controls="goalList"
+              aria-expanded="true"
+            >
+              收起清單
+            </button>
+            <button
+              type="button"
+              id="exitFullscreen"
+              aria-label="離開全螢幕"
+              title="離開全螢幕（Esc）"
+              hidden
+            >
+              ⤢
+            </button>
+          </div>
           <p id="delivery" class="delivery-status" role="status"></p>
           <p id="sceneUnavailable" role="status" hidden>
             這個瀏覽器目前無法顯示 3D。你仍可選取支柱，查看每項行動。

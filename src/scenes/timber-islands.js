@@ -1255,6 +1255,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
   const dots = [];
   const routes = [];
   const centers = [];
+  const labelPoints = [];
   const pickables = [hub];
   hub.userData.pillar = 8;
   pillars.forEach((pillar, i) => {
@@ -1264,6 +1265,10 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     const outward = polar(1, a);
     const lateral = vec(-outward.z, 0, outward.x);
     centers.push(center);
+    labelPoints.push([
+      polar(innerEdge + depth + 0.32, a, -0.43),
+      polar(innerEdge + depth + 1.75, a, -0.68),
+    ]);
     const land = new T.Group();
     land.position.copy(center);
     land.userData.pillar = i;
@@ -1469,7 +1474,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     pieces: [],
     centers,
     pickables,
-    labelPoints: centers.map((point) => point.clone().setY(1.15)),
+    labelPoints,
     dispose() {
       sleepMaterial.map.dispose();
     },

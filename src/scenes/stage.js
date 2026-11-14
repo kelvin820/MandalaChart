@@ -228,15 +228,18 @@ export function mountStage(
     renderer.render(scene, camera);
     if (model.labelPoints && onLabels) {
       onLabels(
-        model.labelPoints.map((anchor) => {
-          const p = anchor.clone().project(camera);
-          return [(p.x + 1) * 50, (1 - p.y) * 50, p.z >= -1 && p.z <= 1];
-        }),
+        model.labelPoints.map((points) =>
+          points.map((point) => {
+            const p = projectedLabel.copy(point).project(camera);
+            return [(p.x + 1) * 50, (1 - p.y) * 50, p.z >= -1 && p.z <= 1];
+          }),
+        ),
       );
     }
     if (motion) requestRender();
   }
 
+  const projectedLabel = new THREE.Vector3();
   function resize() {
     const { clientWidth: width, clientHeight: height } = canvas;
     if (!width || !height) return;

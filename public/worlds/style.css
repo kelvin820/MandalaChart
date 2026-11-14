@@ -130,11 +130,15 @@ body.personal-world {
 .personal-world .world-status {
   padding: 8px 16px 0;
 }
-#toggleGoals {
+.viewport-controls {
   position: absolute;
   z-index: 3;
   top: 12px;
   right: 12px;
+  display: flex;
+  gap: 6px;
+}
+.viewport-controls button {
   color: #fff1d9;
   background: #151e33ee;
   font-size: 12px;
@@ -563,6 +567,17 @@ dialog::backdrop {
   pointer-events: none;
   z-index: 1;
 }
+#islandLabelLines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: #fff0c7a1;
+  stroke-width: 1;
+}
+#islandLabelLines line {
+  vector-effect: non-scaling-stroke;
+}
 #islandLabels button {
   position: absolute;
   display: flex;
@@ -571,7 +586,7 @@ dialog::backdrop {
   transform: translate(-50%, -50%);
   pointer-events: auto;
   white-space: nowrap;
-  max-width: min(158px, 24%);
+  max-width: min(150px, 26%);
   border: 1px solid #ffffff90;
   border-radius: 999px;
   padding: 4px 9px;
@@ -586,6 +601,7 @@ dialog::backdrop {
   text-overflow: ellipsis;
 }
 #islandLabels button small {
+  flex-shrink: 0;
   color: #855337;
 }
 #islandLabels button .island-progress {
@@ -612,5 +628,73 @@ dialog::backdrop {
     font-size: 9px;
     padding: 3px 5px;
     gap: 2px;
+  }
+}
+
+html:fullscreen body.world-immersive {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.world-immersive > header,
+.world-immersive #sample {
+  display: none;
+}
+.world-immersive main {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.world-immersive .workspace {
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.world-immersive .workspace .viewport {
+  min-height: 0;
+}
+.world-immersive .workspace > aside {
+  max-height: 100%;
+  overflow-y: auto;
+}
+.world-immersive .scene-title,
+.world-immersive .goal-label,
+.world-immersive .delivery-status,
+.world-immersive .scene-footer span,
+.world-immersive .legend {
+  display: none;
+}
+.world-immersive .scene-footer {
+  bottom: 12px;
+  justify-content: flex-end;
+}
+.world-immersive .island-tools {
+  right: 135px;
+}
+#exitFullscreen {
+  min-width: 36px;
+  padding: 4px 8px;
+  font-size: 18px;
+  line-height: 1;
+}
+@media (max-width: 700px) {
+  .world-immersive .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .world-immersive .workspace.goals-hidden {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .world-immersive .workspace > aside {
+    max-height: 45dvh;
   }
 }
