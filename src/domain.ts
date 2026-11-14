@@ -20,6 +20,11 @@ export const pillarsOutput = z.object({
 });
 export const pillarOutput = z.object({ subGoal: pillarSchema });
 export const atomsOutput = z.object({ actions: z.array(atomSchema).length(8) });
+export const branchesOutput = z.object({
+  branches: z.array(atomsOutput).length(8),
+});
+export const fullPlanOutput = pillarsOutput.extend(branchesOutput.shape);
+export const fullPillarOutput = pillarOutput.extend(atomsOutput.shape);
 const indexKey = z.string().regex(/^[0-7]$/);
 export const chartSchema = z.object({
   id: z.string().uuid(),
@@ -45,6 +50,7 @@ export const generationSchema = z
   .object({
     requestId: z.string().uuid(),
     operation: z.enum(["create", "all", "pillar", "expand"]),
+    full: z.literal(true).optional(),
     goal: z.string().trim().min(1).max(200),
     ...contextSchema.shape,
     subGoals: z.array(pillarSchema).length(8).optional(),
@@ -54,6 +60,8 @@ export const generationSchema = z
     user: z.string().trim().min(1).max(15000),
   })
   .superRefine((v, c) => {
+    if (v.full && v.operation !== "create" && v.operation !== "pillar")
+      c.addIssue({ code: "custom", message: "此操作不支援兩層生成" });
     if (
       (v.operation === "pillar" || v.operation === "expand") &&
       (!v.subGoals || v.index === undefined)
@@ -131,6 +139,25 @@ export function validateOutput(op: Operation, raw: unknown) {
       ? atomsOutput.parse(raw)
       : pillarsOutput.parse(raw);
 }
+
+export function makeBranchesPrompt(
+  goal: Context & { goal: string },
+  pillars: Pillar[],
+  firstIndex: number,
+  count: number,
+) {
+  const { system } = makePrompt("expand", goal);
+  const outline = pillars.slice(firstIndex, firstIndex + count).map((pillar, i) =>
+    [`${firstIndex + i + 1}. ${pillar.title}`, pillar.description, pillar.actionHint].join("\n"),
+  ).join("\n\n");
+  const otherPillars = pillars
+    .filter((_, index) => index < firstIndex || index >= firstIndex + count)
+    .map((pillar) => pillar.title).join("、");
+  return {
+    system: system.replace("將指定支柱拆成八個", "將每個指定支柱各自拆成八個"),
+    user: `終極目標：${goal.goal}\n${contextBlock(goal)}\n其他支柱：${otherPillars}\n\n要展開的支柱：\n${outline}\n\n依指定支柱的順序回傳 branches 陣列，各支柱對應一個包含 8 項 actions 的物件。避免與其他支柱重疊，時間與成本共用整體限制。若需要分配資源，請按該支柱對終極目標的比重預留其他支柱的份額。每項 title 建議 8 至 18 字，detail 與 criterion 分別用一句簡明的繁體中文寫法。`,
+  };
+}
 export function clearBranch(c: Chart, i: number) {
   delete c.expansions[String(i)];
   for (const k of Object.keys(c.doneActions))
@@ -143,6 +170,7 @@ export function applyCandidate(
   raw: unknown,
   index?: number,
   context?: Context,
+  full?: boolean,
 ): Chart {
   const c = structuredClone(chart),
     output = validateOutput(op, raw);
@@ -155,7 +183,10 @@ export function applyCandidate(
   } else if (op === "pillar" && index !== undefined) {
     c.subGoals[index] = (output as z.infer<typeof pillarOutput>).subGoal;
     clearBranch(c, index);
-    delete c.pillarContexts[String(index)];
+    if (full) {
+      c.expansions[index] = fullPillarOutput.parse(raw).actions;
+      if (context) c.pillarContexts[index] = context;
+    } else delete c.pillarContexts[String(index)];
   } else if (op === "expand" && index !== undefined) {
     clearBranch(c, index);
     c.expansions[String(index)] = (

@@ -5,6 +5,8 @@ import {
   makePrompt,
   validateOutput,
   applyCandidate,
+  fullPlanOutput,
+  fullPillarOutput,
   clearBranch,
   type Chart,
   type Context,
@@ -104,7 +106,7 @@ function readContext(prefix: string): Context {
   });
 }
 function renderHome() {
-  app.innerHTML = `<section class="hero"><div class="hero-copy"><h1>從一個願望，<br><em>走出下一步。</em></h1><p>把願望拆成八個支柱，找出今天就能做的事。每勾選一項完成的行動，願望浮島的希望火炬就會更亮。</p><div class="hero-actions"><button data-action="focusGoal">開始寫下目標 <span aria-hidden="true">↓</span></button><button data-action="demo" class="hero-demo" ${loadError ? "disabled" : ""}>看看範例 <span aria-hidden="true">↗</span></button></div></div><mandala-preview class="hero-art" aria-hidden="true"></mandala-preview></section>${loadError ? `<div class="error-banner" role="alert">${escape(loadError)} <button data-action="reload">重新連線</button></div>` : ""}<div class="home-layout"><section class="panel"><div class="panel-heading"><h2>你的終極目標</h2><span class="step">01 / DEFINE</span></div><form id="createForm"><label class="field"><span class="label">你想實現什麼？</span><textarea id="goalInput" class="goal-input" maxlength="200" required placeholder="例如：一年後，能自信地用英文完成工作簡報">${escape(draft.goal)}</textarea><span class="char-count">不必一次想完整，先寫下你想去的方向。</span></label><div class="examples">${examples.map((s, i) => `<button type="button" data-action="example" data-index="${i}">${escape(s)}</button>`).join("")}</div><details class="context"><summary>＋ 加上期限、起點與限制，讓拆解更貼近你</summary>${contextFields("home", draft)}</details><div class="submit-row"><button class="primary" type="submit" ${loadError ? "disabled" : ""}>一起拆解目標　↗</button><small>生成前可檢視<br>與修改 Prompt</small></div></form></section><aside class="home-side"><div class="eyebrow">A THOUGHTFUL WAY FORWARD</div><div class="steps">${[
+  app.innerHTML = `<section class="hero"><div class="hero-copy"><h1>從一個願望，<br><em>走出下一步。</em></h1><p>把願望拆成八個支柱，找出今天就能做的事。每勾選一項完成的行動，願望浮島的希望火炬就會更亮。</p><div class="hero-actions"><button data-action="focusGoal">開始寫下目標 <span aria-hidden="true">↓</span></button><button data-action="demo" class="hero-demo" ${loadError ? "disabled" : ""}>看看範例 <span aria-hidden="true">↗</span></button></div></div><mandala-preview class="hero-art" aria-hidden="true"></mandala-preview></section>${loadError ? `<div class="error-banner" role="alert">${escape(loadError)} <button data-action="reload">重新連線</button></div>` : ""}<div class="home-layout"><section class="panel"><div class="panel-heading"><h2>你的終極目標</h2><span class="step">01 / DEFINE</span></div><form id="createForm"><label class="field"><span class="label">你想實現什麼？</span><textarea id="goalInput" class="goal-input" maxlength="200" required placeholder="例如：一年後，能自信地用英文完成工作簡報">${escape(draft.goal)}</textarea><span class="char-count">不必一次想完整，先寫下你想去的方向。</span></label><div class="examples">${examples.map((s, i) => `<button type="button" data-action="example" data-index="${i}">${escape(s)}</button>`).join("")}</div><details class="context"><summary>＋ 加上期限、起點與限制，讓拆解更貼近你</summary>${contextFields("home", draft)}</details><div class="submit-row"><button class="primary" type="submit" ${loadError ? "disabled" : ""}>${ready ? "一鍵生成完整曼陀羅表 ↗" : "開始拆解目標 ↗"}</button><small>${ready ? "八個支柱 · 六十四項行動" : "可匯入外部 AI 的結果"}</small></div></form></section><aside class="home-side"><div class="eyebrow">A THOUGHTFUL WAY FORWARD</div><div class="steps">${[
     ["先說清楚想要什麼", "目標、起點與限制，都是拆解的依據。"],
     ["找到支持它的八個支柱", "能力、習慣、資源，都可以是一塊拼圖。"],
     ["拆成真正能開始的一步", "逐格展開，調整到適合自己的大小。"],
@@ -227,7 +229,7 @@ function renderBranch() {
     : `<button type="button" class="cell center" data-action="expand"><small>PILLAR 0${i + 1}</small><strong>${escape(p.title)}</strong><small>展開八項行動 ↗</small></button>`;
   const grid = atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? center : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-pressed="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div>` : `<div class="grid" aria-label="尚未展開的行動九宮格">${POS.map((j) => j === -1 ? center : '<div class="cell empty-atom" aria-hidden="true"></div>').join("")}</div>`;
   const mini = `<button class="overview-mini" data-action="collapse" aria-label="返回第一層曼陀羅九宮格"><span class="mini-grid" aria-hidden="true">${POS.map((j) => `<i class="${j === i ? "mini-active" : j === -1 ? "mini-center" : ""}"></i>`).join("")}</span><span>返回總覽</span></button>`;
-  el.innerHTML = `<section class="branch" id="branch"><div class="branch-board">${grid}<div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div></div>${atoms ? '<div id="atomDetail"></div>' : ""}<div class="branch-head"><div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">這一格換個方向</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}</section>`;
+  el.innerHTML = `<section class="branch" id="branch"><div class="branch-board">${grid}<div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div></div>${atoms ? '<div id="atomDetail"></div>' : ""}<div class="branch-head"><div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">重新生成此支柱</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}</section>`;
   if (atoms) renderAtom();
 }
 function renderAtom() {
@@ -290,6 +292,7 @@ type Pending = {
 let pending: Pending | null = null,
   pendingTimer: number | undefined,
   candidate: unknown = null;
+let finishing = false;
 function outputFormat(op: Operation) {
   return op === "expand"
     ? '{"actions":[{"title":"動詞開頭的行動或具體能力","detail":"具體做法","kind":"action 或 capability","criterion":"完成或驗證標準"}]}（actions 必須恰好八項）'
@@ -303,7 +306,10 @@ function openPrompt(op: Operation) {
     return;
   }
   const c = op === "create" ? draft : current!;
-  const local = op === "expand" ? readContext("pillar") : undefined;
+  const full = ready && (op === "create" || op === "pillar");
+  const local = op === "expand" || (op === "pillar" && full)
+    ? readContext("pillar")
+    : undefined;
   const prompts = makePrompt(
     op,
     c,
@@ -316,6 +322,7 @@ function openPrompt(op: Operation) {
     input: {
       requestId: crypto.randomUUID(),
       operation: op,
+      ...(full ? { full: true as const } : {}),
       ...{
         goal: c.goal,
         deadline: c.deadline,
@@ -334,7 +341,8 @@ function openPrompt(op: Operation) {
     createdAt: Date.now(),
   };
   candidate = null;
-  renderPrompt();
+  if (op === "create" && full) void startGeneration();
+  else renderPrompt();
 }
 function renderPrompt() {
   const p = pending!;
@@ -366,10 +374,12 @@ async function startGeneration() {
       $("#promptError").textContent = "Prompt 不能空白。";
     return;
   }
+  if (sessionStorage.getItem("mandala-pending")) return;
   pending.createdAt = Date.now();
   sessionStorage.setItem("mandala-pending", JSON.stringify(pending));
   showPending();
   const id = pending.input.requestId;
+  if (pending.input.full) void pollPending();
   try {
     const job = await api("/api/generations", {
       method: "POST",
@@ -377,10 +387,7 @@ async function startGeneration() {
     });
     if (pending?.input.requestId !== id) return;
     if (job.state === "succeeded") {
-      candidate = job.payload;
-      clearPendingTimer();
-      sessionStorage.removeItem("mandala-pending");
-      renderCandidate();
+      await finishGeneration(job.payload);
     } else if (job.state === "failed") generationError(job.error);
     else pollPending();
   } catch (e) {
@@ -397,12 +404,87 @@ async function startGeneration() {
     }
   }
 }
+async function finishGeneration(payload: unknown) {
+  if (!pending || finishing) return;
+  finishing = true;
+  clearPendingTimer();
+  const request = pending;
+  try {
+    setRacePhase("done");
+    if (request.input.operation === "create" && request.input.full) {
+      const plan = fullPlanOutput.parse(payload);
+      const now = new Date().toISOString();
+      const id = request.input.requestId;
+      let saved = charts.find((chart) => chart.id === id);
+      if (!saved) {
+        try {
+          saved = await saveChart(chartSchema.parse({
+            id,
+            goal: request.input.goal,
+            deadline: request.input.deadline,
+            currentState: request.input.currentState,
+            constraints: request.input.constraints,
+            subGoals: plan.subGoals,
+            expansions: Object.fromEntries(plan.branches.map((branch, i) => [i, branch.actions])),
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          }), null);
+        } catch (error) {
+          // A lost response can leave a successfully saved chart on the server.
+          const result = await api("/api/charts/" + id).catch(() => null);
+          if (!result) {
+            generationError("生成已完成，但目前無法儲存。請按「重新檢查狀態」再試，無須重新生成。", true);
+            return;
+          }
+          saved = chartSchema.parse(result.chart);
+          charts = [saved, ...charts.filter((chart) => chart.id !== id)];
+        }
+      }
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      if (pending !== request) return;
+      sessionStorage.removeItem("mandala-pending");
+      pending = null;
+      undo = null;
+      dialog.close();
+      openChart(saved.id);
+      toast("已儲存八個支柱與六十四項行動。");
+    } else {
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      if (pending !== request) return;
+      candidate = payload;
+      sessionStorage.removeItem("mandala-pending");
+      renderCandidate();
+    }
+  } finally {
+    finishing = false;
+  }
+}
+
+function setRacePhase(phase: "actions" | "done") {
+  const race = document.querySelector<HTMLElement>(".generation-race");
+  if (!race || race.dataset.phase === phase) return;
+  const runner = race.querySelector<HTMLElement>(".race-runner")!;
+  runner.style.setProperty("--race-from", getComputedStyle(runner).left);
+  race.dataset.phase = phase;
+}
+
 function showPending() {
   if (!pending) return;
+  const creating = pending.input.operation === "create" && pending.input.full;
   show(
     modal(
       "正在為你的目標找方向",
-      `<div class="waiting"><div class="spinner"></div><strong>${pending.input.operation === "expand" ? "把支柱拆成能開始的小步驟。" : "找出支持目標的八個支柱。"}</strong><p id="waitStatus">已等待 <span id="elapsed">${Math.floor((Date.now() - pending.createdAt) / 1000)}</span> 秒。生成完成後，會先讓你預覽。</p><p>原內容仍保留。你可以先關閉視窗，結果會在完成後顯示。</p></div>`,
+      `<div class="waiting">
+        <div class="generation-race" data-phase="pillars" aria-hidden="true">
+          <div class="race-track"></div><div class="race-flag"></div>
+          <div class="race-runner"><img src="/brand/runner.svg" alt="" width="80" height="92"></div>
+        </div>
+        <strong id="generationPhase" role="status">${pending.input.operation === "expand" ? "正在拆解八項行動" : pending.input.operation === "pillar" ? "正在尋找新的支柱方向" : "正在規劃八個支柱"}</strong>
+        <p id="waitStatus">已等待 <span id="elapsed">${Math.floor((Date.now() - pending.createdAt) / 1000)}</span> 秒。${creating ? "兩層都完成後會自動開啟曼陀羅表。" : "完成後可預覽結果。"}</p>
+      </div>`,
     ),
   );
   if (pendingTimer) clearInterval(pendingTimer);
@@ -418,27 +500,33 @@ function clearPendingTimer() {
   if (pendingTimer) clearInterval(pendingTimer);
   pendingTimer = undefined;
 }
-let polling = false;
+const polling = new Set<string>();
 async function pollPending() {
-  if (polling || !pending) return;
-  polling = true;
+  if (!pending || polling.has(pending.input.requestId)) return;
   const id = pending.input.requestId;
+  polling.add(id);
   try {
     for (let n = 0; n < 65; n++) {
       if (pending?.input.requestId !== id) return;
       await new Promise((r) => setTimeout(r, 4000));
+      if (pending?.input.requestId !== id || finishing) return;
       try {
         const job = await api("/api/generations/" + id);
+        if (pending?.input.requestId !== id || finishing) return;
         if (job.state === "succeeded") {
-          candidate = job.payload;
-          clearPendingTimer();
-          sessionStorage.removeItem("mandala-pending");
-          renderCandidate();
+          await finishGeneration(job.payload);
           return;
         }
         if (job.state === "failed") {
           generationError(job.error);
           return;
+        }
+        if (job.phase === "actions") {
+          const phase = document.querySelector("#generationPhase");
+          setRacePhase("actions");
+          if (phase) phase.textContent = pending.input.operation === "create"
+            ? "正在拆解六十四項行動"
+            : "正在拆解這個支柱的八項行動";
         }
       } catch (e) {
         if ((e as Error).message.includes("找不到") && n > 2) {
@@ -451,16 +539,16 @@ async function pollPending() {
       "暫時無法確認生成結果。原內容仍保留，稍後可重新檢查這次請求。",
     );
   } finally {
-    polling = false;
+    polling.delete(id);
   }
 }
-function generationError(message: string) {
+function generationError(message: string, saveOnly = false) {
   clearPendingTimer();
   show(
     modal(
       "這次生成尚未完成",
       `<div class="error-banner" role="alert">${escape(message)}</div><p>不會替換任何現有內容。</p>`,
-      `<button data-action="abandonPending">放棄這次請求</button><button data-action="checkPending">重新檢查狀態</button><button data-action="retryPrompt" class="primary">調整 Prompt 後重試</button>`,
+      `<button data-action="abandonPending">放棄這次請求</button><button data-action="checkPending">重新檢查狀態</button>${saveOnly ? "" : pending?.input.operation === "create" && pending.input.full ? '<button data-action="retryFull" class="primary">重新生成</button>' : '<button data-action="retryPrompt" class="primary">調整 Prompt 後重試</button>'}`,
     ),
   );
 }
@@ -492,8 +580,13 @@ function normalizeOutput(op: Operation, raw: any) {
 function renderCandidate() {
   if (!pending) return;
   const op = pending.input.operation;
-  candidate = validateOutput(op, normalizeOutput(op, candidate));
+  candidate = pending.input.full && op === "pillar"
+    ? fullPillarOutput.parse(candidate)
+    : validateOutput(op, normalizeOutput(op, candidate));
   const next: any = candidate;
+  const actionsPreview = pending.input.full && op === "pillar"
+    ? `<details class="replacement-actions" open><summary>這個新支柱的八項行動</summary><ol>${fullPillarOutput.parse(candidate).actions.map((action) => `<li><strong>${escape(action.title)}</strong><p>${escape(action.detail)}</p><small>驗證標準　${escape(action.criterion)}</small></li>`).join("")}</ol></details>`
+    : "";
   const items: (Pillar | Atom)[] =
     op === "pillar"
       ? [next.subGoal]
@@ -511,7 +604,7 @@ function renderCandidate() {
   show(
     modal(
       "先看看，是否更接近你想要的方向",
-      `<p>目前內容還沒改變。採用後才會儲存新結果，未採用的候選可以捨棄。</p>${op === "all" ? '<div class="notice">採用整張重生結果後，八個支柱會更新，原本第二層與檢核紀錄會清除。採用後可立即復原一次。</div>' : op === "pillar" ? '<div class="notice">只替換這一個支柱，並清除此支柱的第二層、局部條件與檢核紀錄，其他七格不受影響。</div>' : op === "expand" && old.length ? '<div class="notice">採用後只替換此支柱的八項內容，重設此支柱的檢核紀錄。</div>' : ""}<div class="candidate-list">${items.map((p: any, i) => `<article class="candidate-card">${old[i] ? `<div class="compare-old"><small>目前內容</small><strong>　${escape(old[i].title)}</strong><p>${escape(old[i].detail ?? old[i].description)}</p></div>` : ""}<span class="new-label">CANDIDATE 0${i + 1}${p.kind ? " / " + (p.kind === "capability" ? "原子能力" : "原子行動") : ""}</span><h3>${escape(p.title)}</h3><p>${escape(p.description ?? p.detail)}</p>${p.actionHint ? `<p>行動範例：${escape(p.actionHint)}</p>` : ""}${p.criterion ? `<div class="criterion"><b>驗證標準</b>${escape(p.criterion)}</div>` : ""}</article>`).join("")}</div><div id="candidateError" role="alert" class="modal-error"></div>`,
+      `<p>目前內容還沒改變。採用後才會儲存新結果，未採用的候選可以捨棄。</p>${op === "all" ? '<div class="notice">採用整張重生結果後，八個支柱會更新，原本第二層與檢核紀錄會清除。採用後可立即復原一次。</div>' : op === "pillar" ? `<div class="notice">${pending.input.full ? "採用後會替換此支柱與八項行動，並重設此支柱的檢核紀錄。" : "採用後會替換此支柱，並清除這一格原有的第二層、局部條件與檢核紀錄。"}</div>` : op === "expand" && old.length ? '<div class="notice">採用後只替換此支柱的八項內容，重設此支柱的檢核紀錄。</div>' : ""}<div class="candidate-list">${items.map((p: any, i) => `<article class="candidate-card">${old[i] ? `<div class="compare-old"><small>目前內容</small><strong>　${escape(old[i].title)}</strong><p>${escape(old[i].detail ?? old[i].description)}</p></div>` : ""}<span class="new-label">CANDIDATE 0${i + 1}${p.kind ? " / " + (p.kind === "capability" ? "原子能力" : "原子行動") : ""}</span><h3>${escape(p.title)}</h3><p>${escape(p.description ?? p.detail)}</p>${p.actionHint ? `<p>行動範例：${escape(p.actionHint)}</p>` : ""}${p.criterion ? `<div class="criterion"><b>驗證標準</b>${escape(p.criterion)}</div>` : ""}</article>`).join("")}</div>${actionsPreview}<div id="candidateError" role="alert" class="modal-error"></div>`,
       `<button data-action="discardCandidate">保留舊內容，捨棄候選</button><button data-action="retryPrompt">修改 Prompt 再試一次</button><button data-action="applyCandidate" class="primary">採用並儲存 ↗</button>`,
     ),
   );
@@ -532,6 +625,7 @@ async function adopt() {
       candidate,
       p.input.index,
       p.context,
+      p.input.full,
     );
     const saved = await saveChart(c, p.base.revision);
     undo = { before: p.base, afterRevision: saved.revision };
@@ -985,6 +1079,14 @@ async function act(action: string, button: HTMLElement) {
     pollPending();
     return;
   }
+  if (action === "retryFull") {
+    if (!pending) return;
+    clearPendingTimer();
+    sessionStorage.removeItem("mandala-pending");
+    pending.input.requestId = crypto.randomUUID();
+    await startGeneration();
+    return;
+  }
   if (action === "retryPrompt") {
     clearPendingTimer();
     sessionStorage.removeItem("mandala-pending");
@@ -1002,6 +1104,7 @@ async function act(action: string, button: HTMLElement) {
         .replace(/\s*```$/, "");
       candidate = normalizeOutput(pending!.input.operation, JSON.parse(text));
       validateOutput(pending!.input.operation, candidate);
+      delete pending!.input.full;
       renderCandidate();
     } catch {
       $("#promptError").textContent =

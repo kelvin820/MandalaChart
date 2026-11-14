@@ -1140,6 +1140,97 @@ dialog::backdrop {
   font-size: 12px;
   color: var(--dim);
 }
+.generation-race {
+  --runner-size: clamp(42px, 14vw, 70px);
+  --travel: calc(100% - var(--runner-size) - 30px);
+  position: relative;
+  height: 130px;
+  max-width: 460px;
+  margin: 0 auto 22px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 82% 0%, #57415788, transparent 64%),
+    linear-gradient(160deg, #17213c, #222948 62%, #181f37);
+}
+.race-track {
+  position: absolute;
+  inset: auto 14px 18px;
+  height: 22px;
+  border-block: 1px solid #b7bfe654;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, #9ba7d59e 0 9px, transparent 9px 20px) center / 100% 1px no-repeat, #141c34;
+}
+.race-flag {
+  position: absolute;
+  right: 26px;
+  bottom: 28px;
+  height: 65px;
+  width: 2px;
+  background: #ecd1ad;
+}
+.race-flag::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 25px;
+  height: 18px;
+  background: conic-gradient(#f8d79b 25%, #69434e 0 50%, #f8d79b 0 75%, #69434e 0) 0 0 / 12px 12px;
+}
+.race-runner {
+  position: absolute;
+  bottom: 28px;
+  left: 8px;
+  width: var(--runner-size);
+  animation: race-start 8s ease-out both;
+}
+.race-runner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.generation-race[data-phase="actions"] .race-runner {
+  animation: race-actions 15s ease-out both;
+}
+.generation-race[data-phase="done"] .race-runner {
+  left: var(--travel);
+  animation: race-finish .4s ease-out both;
+}
+@keyframes race-start {
+  from { left: 8px; }
+  to { left: calc(var(--travel) * .39); }
+}
+@keyframes race-actions {
+  from { left: var(--race-from, 8px); }
+  to { left: calc(var(--travel) * .86); }
+}
+@keyframes race-finish {
+  from { left: var(--race-from, 8px); }
+  to { left: var(--travel); }
+}
+.replacement-actions {
+  margin-top: 14px;
+  color: var(--dim);
+}
+.replacement-actions li + li {
+  margin-top: 12px;
+}
+.replacement-actions li p {
+  margin: 2px 0 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .race-runner,
+  .generation-race[data-phase="actions"] .race-runner,
+  .generation-race[data-phase="done"] .race-runner {
+    animation: none;
+    transition: none;
+  }
+  .generation-race[data-phase="actions"] .race-runner {
+    left: calc(var(--travel) * .62);
+  }
+}
 .candidate-list {
   display: grid;
   gap: 10px;

@@ -252,6 +252,30 @@ test("模型錯誤項目數會失敗，不保存不合格候選", async () => {
   assert.equal(job.state, "failed");
   assert.equal((await s.list("a")).length, 0);
 });
+test("兩層生成可查詢第二階段，且拒絕缺少任何一組行動的結果", async () => {
+  const s = fixture(), c = demoChart();
+  const input = { ...gen(), full: true };
+  const branches = c.subGoals.map((_, index) => ({ actions: c.expansions[index] }));
+  const model = async (...args: Parameters<NonNullable<Parameters<typeof api>[4]>>) => {
+    await args[2]?.();
+    const status = await s.job("a", input.requestId);
+    assert.equal(status?.phase, "actions");
+    assert.equal(status?.state, "pending");
+    return { subGoals: c.subGoals, branches };
+  };
+  const response = await api(req("/api/generations", "POST", input), env, s, "a", model);
+  const completed = await response.json() as any;
+  assert.equal(completed.state, "succeeded");
+  assert.equal(completed.payload.branches.flatMap((branch: { actions: unknown[] }) => branch.actions).length, 64);
+
+  const incomplete = { ...gen(), full: true };
+  const invalid = await api(req("/api/generations", "POST", incomplete), env, s, "a", async () => ({
+    subGoals: c.subGoals,
+    branches: branches.slice(0, 7),
+  }));
+  assert.equal(((await invalid.json()) as any).state, "failed");
+  assert.equal((await s.list("a")).length, 0);
+});
 test("持久化生成限流每分鐘最多六次", async () => {
   const s = fixture(),
     model = async () => ({ subGoals: demoChart().subGoals });

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 92" width="80" height="92">
+  <style>
+    .stride { transform-box: view-box; animation: stride .54s ease-in-out infinite alternate; }
+    .leg { transform-origin: 37px 56px; }
+    .arm { transform-origin: 43px 39px; }
+    .reverse { animation-direction: alternate-reverse; }
+    .body { animation: bounce .54s ease-in-out infinite; }
+    @keyframes stride { from { transform: rotate(-30deg); } to { transform: rotate(32deg); } }
+    @keyframes bounce { 50% { transform: translateY(-3px); } }
+    @media (prefers-reduced-motion: reduce) { .stride, .body { animation: none; } }
+  </style>
+  <ellipse cx="39" cy="87" rx="25" ry="3.5" fill="#0d132a" opacity=".65"/>
+  <g class="body" stroke-linecap="round" stroke-linejoin="round">
+    <path class="stride arm" d="M43 39 32 49 24 42" fill="none" stroke="#81516a" stroke-width="8"/>
+    <g class="stride leg reverse">
+      <path d="m37 56 8 13-5 13" fill="none" stroke="#3b5078" stroke-width="9"/>
+      <path d="m39 83 10 2" fill="none" stroke="#adbadb" stroke-width="5"/>
+    </g>
+    <g class="stride leg">
+      <path d="m36 56-10 13 4 13" fill="none" stroke="#5b74a4" stroke-width="9"/>
+      <path d="m30 83 9 1" fill="none" stroke="#f6e8db" stroke-width="6"/>
+    </g>
+    <path d="m32 33-7 6 1 11 10 2 6-15z" fill="#604565" stroke="#a16a83" stroke-width="2"/>
+    <path d="M35 33c4-3 15-3 19 2l-8 25-16-5z" fill="#e39568"/>
+    <path d="m37 54 11 3-2 6-15-3z" fill="#344870"/>
+    <g class="stride arm reverse">
+      <path d="m43 39 3 10 11-7" fill="none" stroke="#fac498" stroke-width="7"/>
+      <path d="m43 39 2 5" fill="none" stroke="#f5b57e" stroke-width="9"/>
+    </g>
+    <path d="m32 34-19 5 5 4 17-4" fill="#f7c482"/>
+    <circle cx="48" cy="23" r="12" fill="#ffcca1"/>
+    <path d="M36 24c-4-7 2-16 12-16 8 0 12 6 13 9l-8 2-3-3c-4 5-7 8-14 8z" fill="#372c4b"/>
+    <circle cx="55" cy="23" r="1.5" fill="#372c4b"/>
+  </g>
+</svg>

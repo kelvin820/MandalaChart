@@ -5,7 +5,8 @@ import {
   pillarsOutput,
   pillarOutput,
   atomsOutput,
-  validateOutput,
+  makeBranchesPrompt,
+  makePrompt,
   type Generation,
 } from "../src/domain.ts";
 export type ModelEnv = {
@@ -16,6 +17,10 @@ export type ModelEnv = {
   OPENAI_MODEL?: string;
 };
 const defaultNvidiaModel = "nvidia/nemotron-3.5-super-vl-120b-a12b";
+const branchesPerRequest = 2;
+const branchBatchOutput = z.object({
+  branches: z.array(atomsOutput).length(branchesPerRequest),
+});
 
 export function nvidiaConfig(env: ModelEnv) {
   const apiKey = env.NVIDIA_API_KEY?.trim() || env.NGC_API_KEY?.trim();
@@ -60,13 +65,14 @@ const nvidiaResponse = z.object({
     .min(1),
 });
 
-async function completeNvidia(
-  input: Generation,
+async function completeNvidia<S extends z.ZodType>(
+  input: Pick<Generation, "system" | "user">,
   config: NonNullable<ReturnType<typeof nvidiaConfig>>,
-  schema: typeof pillarsOutput | typeof pillarOutput | typeof atomsOutput,
-) {
+  schema: S,
+  signal: AbortSignal,
+  batch: boolean,
+): Promise<z.output<S>> {
   const { apiKey, model } = config;
-  const signal = AbortSignal.timeout(90_000);
   let response: Response;
   try {
     response = await fetch(
@@ -87,12 +93,12 @@ async function completeNvidia(
           ],
           stream: false,
           temperature: 0.3,
-          max_tokens: 4096,
+          max_tokens: batch ? 5000 : 4096,
           ...(model === defaultNvidiaModel ? { reasoning_effort: "none" } : {}),
           response_format: {
             type: "json_schema",
             json_schema: {
-              name: `mandala_${input.operation}`,
+              name: batch ? "mandala_branches" : "mandala_result",
               schema: z.toJSONSchema(schema, { io: "input" }),
             },
           },
@@ -119,10 +125,7 @@ async function completeNvidia(
   if (!result.success)
     throw new NvidiaGenerationError("NVIDIA 沒有回傳完整的結果，請再試一次。");
   try {
-    return validateOutput(
-      input.operation,
-      JSON.parse(result.data.choices[0].message.content),
-    );
+    return schema.parse(JSON.parse(result.data.choices[0].message.content));
   } catch {
     throw new NvidiaGenerationError(
       "NVIDIA 的回覆未通過曼陀羅表的格式驗證，請再試一次。",
@@ -130,25 +133,78 @@ async function completeNvidia(
   }
 }
 
-export async function completeStructured(input: Generation, env: ModelEnv) {
-  const config = modelConfig(env);
-  if (!config) throw new Error("MODEL_NOT_CONFIGURED");
+export async function completeStructured(
+  input: Generation,
+  env: ModelEnv,
+  onActions?: () => Promise<void>,
+) {
+  const configured = modelConfig(env);
+  if (!configured) throw new Error("MODEL_NOT_CONFIGURED");
+  const config = configured;
   const schema =
     input.operation === "pillar"
       ? pillarOutput
       : input.operation === "expand"
         ? atomsOutput
         : pillarsOutput;
-  if (config.provider === "nvidia")
-    return completeNvidia(input, config, schema);
-  const provider = createOpenAI({ apiKey: config.apiKey });
-  const result = await generateText({
-    model: provider.responses(config.model),
-    system: input.system,
-    prompt: input.user,
-    output: Output.object({ schema }),
-    maxRetries: 0,
-    abortSignal: AbortSignal.timeout(180_000),
-  });
-  return validateOutput(input.operation, result.output);
+  const signal = AbortSignal.timeout(
+    input.full ? 180_000 : config.provider === "nvidia" ? 90_000 : 180_000,
+  );
+  async function ask<S extends z.ZodType>(
+    prompts: Pick<Generation, "system" | "user">,
+    format: S,
+    batch = false,
+  ): Promise<z.output<S>> {
+    if (config.provider === "nvidia")
+      return completeNvidia(prompts, config, format, signal, batch);
+    const provider = createOpenAI({ apiKey: config.apiKey });
+    const result = await generateText({
+      model: provider.responses(config.model),
+      system: prompts.system,
+      prompt: prompts.user,
+      output: Output.object({ schema: format }),
+      maxRetries: 0,
+      abortSignal: signal,
+    });
+    return format.parse(result.output);
+  }
+
+  if (input.full && input.operation === "create") {
+    const first = await ask(input, pillarsOutput);
+    await onActions?.();
+    const batches = await Promise.all(
+      Array.from(
+        { length: first.subGoals.length / branchesPerRequest },
+        (_, i) =>
+          ask(
+            makeBranchesPrompt(
+              input,
+              first.subGoals,
+              i * branchesPerRequest,
+              branchesPerRequest,
+            ),
+            branchBatchOutput,
+            true,
+          ),
+      ),
+    );
+    return { ...first, branches: batches.flatMap(({ branches }) => branches) };
+  }
+  if (
+    input.full &&
+    input.operation === "pillar" &&
+    input.subGoals &&
+    input.index !== undefined
+  ) {
+    const first = await ask(input, pillarOutput);
+    const pillars = input.subGoals.slice();
+    pillars[input.index] = first.subGoal;
+    await onActions?.();
+    const second = await ask(
+      makePrompt("expand", input, pillars, input.index, input.pillarContext),
+      atomsOutput,
+    );
+    return { ...first, ...second };
+  }
+  return ask(input, schema);
 }

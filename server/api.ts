@@ -2,6 +2,8 @@ import { attachment, chartFile, type FileStore } from "./files.ts";
 import { z } from "zod";
 import {
   chartSchema,
+  fullPillarOutput,
+  fullPlanOutput,
   generationSchema,
   validProgress,
   validateOutput,
@@ -12,6 +14,7 @@ import { completeStructured, modelConfig, NvidiaGenerationError, type ModelEnv }
 export type Job = {
   requestId: string;
   state: "pending" | "succeeded" | "failed";
+  phase?: "pillars" | "actions";
   payload?: unknown;
   error?: string;
   createdAt: number;
@@ -42,6 +45,7 @@ export async function api(
   generate: (
     g: Generation,
     e: ModelEnv,
+    onActions?: () => Promise<void>,
   ) => Promise<unknown> = completeStructured,
   files?: FileStore,
 ) {
@@ -159,6 +163,7 @@ export async function api(
         requestId: input.requestId,
         state: "pending",
         createdAt: Date.now(),
+        ...(input.full ? { phase: "pillars" as const } : {}),
       };
       if (!(await store.reserve(owner, job)))
         return json(
@@ -168,10 +173,13 @@ export async function api(
           429,
         );
       try {
-        job.payload = validateOutput(
-          input.operation,
-          await generate(input, env),
-        );
+        const raw = await generate(input, env, async () => {
+          job.phase = "actions";
+          await store.finish(owner, job);
+        });
+        job.payload = input.full
+          ? (input.operation === "create" ? fullPlanOutput : fullPillarOutput).parse(raw)
+          : validateOutput(input.operation, raw);
         job.state = "succeeded";
       } catch (error) {
         job.state = "failed";
