@@ -178,7 +178,7 @@ export async function api(
           await store.finish(owner, job);
         });
         job.payload = input.full
-          ? (input.operation === "create" ? fullPlanOutput : fullPillarOutput).parse(raw)
+          ? (input.operation === "pillar" ? fullPillarOutput : fullPlanOutput).parse(raw)
           : validateOutput(input.operation, raw);
         job.state = "succeeded";
       } catch (error) {

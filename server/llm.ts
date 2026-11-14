@@ -169,7 +169,7 @@ export async function completeStructured(
     return format.parse(result.output);
   }
 
-  if (input.full && input.operation === "create") {
+  if (input.full && (input.operation === "create" || input.operation === "all")) {
     const first = await ask(input, pillarsOutput);
     await onActions?.();
     const batches = await Promise.all(

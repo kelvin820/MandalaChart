@@ -7,6 +7,7 @@ import {
   applyCandidate,
   fullPlanOutput,
   fullPillarOutput,
+  planExpansions,
   clearBranch,
   type Chart,
   type Context,
@@ -306,7 +307,7 @@ function openPrompt(op: Operation) {
     return;
   }
   const c = op === "create" ? draft : current!;
-  const full = ready && (op === "create" || op === "pillar");
+  const full = ready && op !== "expand";
   const local = op === "expand" || (op === "pillar" && full)
     ? readContext("pillar")
     : undefined;
@@ -348,7 +349,7 @@ function renderPrompt() {
   const p = pending!;
   const name = {
     create: "生成八個行動支柱",
-    all: "重新生成八個支柱",
+    all: p.input.full ? "重新生成整張曼陀羅表" : "重新生成八個支柱",
     pillar: "為這一格換個方向",
     expand: "拆解八項原子行動／能力",
   }[p.input.operation];
@@ -425,7 +426,7 @@ async function finishGeneration(payload: unknown) {
             currentState: request.input.currentState,
             constraints: request.input.constraints,
             subGoals: plan.subGoals,
-            expansions: Object.fromEntries(plan.branches.map((branch, i) => [i, branch.actions])),
+            expansions: planExpansions(plan),
             revision: 0,
             createdAt: now,
             updatedAt: now,
@@ -524,9 +525,9 @@ async function pollPending() {
         if (job.phase === "actions") {
           const phase = document.querySelector("#generationPhase");
           setRacePhase("actions");
-          if (phase) phase.textContent = pending.input.operation === "create"
-            ? "正在拆解六十四項行動"
-            : "正在拆解這個支柱的八項行動";
+          if (phase) phase.textContent = pending.input.operation === "pillar"
+            ? "正在拆解這個支柱的八項行動"
+            : "正在拆解六十四項行動";
         }
       } catch (e) {
         if ((e as Error).message.includes("找不到") && n > 2) {
@@ -577,15 +578,19 @@ function normalizeOutput(op: Operation, raw: any) {
     };
   return raw;
 }
+function renderReplacementActions(actions: Atom[], label: string, open = false) {
+  return `<details class="replacement-actions"${open ? " open" : ""}><summary>${label}</summary><ol>${actions.map((action) => `<li><strong>${escape(action.title)}</strong><p>${escape(action.detail)}</p><small>驗證標準　${escape(action.criterion)}</small></li>`).join("")}</ol></details>`;
+}
 function renderCandidate() {
   if (!pending) return;
-  const op = pending.input.operation;
-  candidate = pending.input.full && op === "pillar"
+  const { operation: op, full } = pending.input;
+  const plan = full && op === "all" ? fullPlanOutput.parse(candidate) : undefined;
+  candidate = plan ?? (full && op === "pillar"
     ? fullPillarOutput.parse(candidate)
-    : validateOutput(op, normalizeOutput(op, candidate));
+    : validateOutput(op, normalizeOutput(op, candidate)));
   const next: any = candidate;
-  const actionsPreview = pending.input.full && op === "pillar"
-    ? `<details class="replacement-actions" open><summary>這個新支柱的八項行動</summary><ol>${fullPillarOutput.parse(candidate).actions.map((action) => `<li><strong>${escape(action.title)}</strong><p>${escape(action.detail)}</p><small>驗證標準　${escape(action.criterion)}</small></li>`).join("")}</ol></details>`
+  const actionsPreview = full && op === "pillar"
+    ? renderReplacementActions(fullPillarOutput.parse(candidate).actions, "這個新支柱的八項行動", true)
     : "";
   const items: (Pillar | Atom)[] =
     op === "pillar"
@@ -604,7 +609,7 @@ function renderCandidate() {
   show(
     modal(
       "先看看，是否更接近你想要的方向",
-      `<p>目前內容還沒改變。採用後才會儲存新結果，未採用的候選可以捨棄。</p>${op === "all" ? '<div class="notice">採用整張重生結果後，八個支柱會更新，原本第二層與檢核紀錄會清除。採用後可立即復原一次。</div>' : op === "pillar" ? `<div class="notice">${pending.input.full ? "採用後會替換此支柱與八項行動，並重設此支柱的檢核紀錄。" : "採用後會替換此支柱，並清除這一格原有的第二層、局部條件與檢核紀錄。"}</div>` : op === "expand" && old.length ? '<div class="notice">採用後只替換此支柱的八項內容，重設此支柱的檢核紀錄。</div>' : ""}<div class="candidate-list">${items.map((p: any, i) => `<article class="candidate-card">${old[i] ? `<div class="compare-old"><small>目前內容</small><strong>　${escape(old[i].title)}</strong><p>${escape(old[i].detail ?? old[i].description)}</p></div>` : ""}<span class="new-label">CANDIDATE 0${i + 1}${p.kind ? " / " + (p.kind === "capability" ? "原子能力" : "原子行動") : ""}</span><h3>${escape(p.title)}</h3><p>${escape(p.description ?? p.detail)}</p>${p.actionHint ? `<p>行動範例：${escape(p.actionHint)}</p>` : ""}${p.criterion ? `<div class="criterion"><b>驗證標準</b>${escape(p.criterion)}</div>` : ""}</article>`).join("")}</div>${actionsPreview}<div id="candidateError" role="alert" class="modal-error"></div>`,
+      `<p>目前內容還沒改變。採用後才會儲存新結果，未採用的候選可以捨棄。</p>${op === "all" ? `<div class="notice">${plan ? "採用後會替換八個支柱和六十四項行動，並重設行動檢核與支柱的局部條件。" : "採用後會替換八個支柱，並清除原第二層、檢核紀錄與支柱的局部條件。"}採用後可立即復原一次。</div>` : op === "pillar" ? `<div class="notice">${pending.input.full ? "採用後會替換此支柱與八項行動，並重設此支柱的檢核紀錄。" : "採用後會替換此支柱，並清除這一格原有的第二層、局部條件與檢核紀錄。"}</div>` : op === "expand" && old.length ? '<div class="notice">採用後只替換此支柱的八項內容，重設此支柱的檢核紀錄。</div>' : ""}<div class="candidate-list">${items.map((p: any, i) => `<article class="candidate-card">${old[i] ? `<div class="compare-old"><small>目前內容</small><strong>　${escape(old[i].title)}</strong><p>${escape(old[i].detail ?? old[i].description)}</p></div>` : ""}<span class="new-label">CANDIDATE 0${i + 1}${p.kind ? " / " + (p.kind === "capability" ? "原子能力" : "原子行動") : ""}</span><h3>${escape(p.title)}</h3><p>${escape(p.description ?? p.detail)}</p>${p.actionHint ? `<p>行動範例：${escape(p.actionHint)}</p>` : ""}${p.criterion ? `<div class="criterion"><b>驗證標準</b>${escape(p.criterion)}</div>` : ""}${plan ? renderReplacementActions(plan.branches[i].actions, "查看八項新行動") : ""}</article>`).join("")}</div>${actionsPreview}<div id="candidateError" role="alert" class="modal-error"></div>`,
       `<button data-action="discardCandidate">保留舊內容，捨棄候選</button><button data-action="retryPrompt">修改 Prompt 再試一次</button><button data-action="applyCandidate" class="primary">採用並儲存 ↗</button>`,
     ),
   );
@@ -630,6 +635,11 @@ async function adopt() {
     const saved = await saveChart(c, p.base.revision);
     undo = { before: p.base, afterRevision: saved.revision };
     current = saved;
+    if (p.input.operation === "all") {
+      selected = null;
+      actionIndex = 0;
+      wholeBoard = false;
+    }
   } else {
     const now = new Date().toISOString();
     const c = chartSchema.parse({

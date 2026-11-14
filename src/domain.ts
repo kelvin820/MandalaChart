@@ -25,6 +25,9 @@ export const branchesOutput = z.object({
 });
 export const fullPlanOutput = pillarsOutput.extend(branchesOutput.shape);
 export const fullPillarOutput = pillarOutput.extend(atomsOutput.shape);
+export function planExpansions(plan: z.infer<typeof fullPlanOutput>) {
+  return Object.fromEntries(plan.branches.map(({ actions }, i) => [i, actions]));
+}
 const indexKey = z.string().regex(/^[0-7]$/);
 export const chartSchema = z.object({
   id: z.string().uuid(),
@@ -60,7 +63,7 @@ export const generationSchema = z
     user: z.string().trim().min(1).max(15000),
   })
   .superRefine((v, c) => {
-    if (v.full && v.operation !== "create" && v.operation !== "pillar")
+    if (v.full && v.operation === "expand")
       c.addIssue({ code: "custom", message: "此操作不支援兩層生成" });
     if (
       (v.operation === "pillar" || v.operation === "expand") &&
@@ -172,16 +175,16 @@ export function applyCandidate(
   context?: Context,
   full?: boolean,
 ): Chart {
-  const c = structuredClone(chart),
-    output = validateOutput(op, raw);
+  const c = structuredClone(chart);
   if (op === "all") {
-    c.subGoals = (output as z.infer<typeof pillarsOutput>).subGoals;
-    c.expansions = {};
+    const plan = full ? fullPlanOutput.parse(raw) : undefined;
+    c.subGoals = plan?.subGoals ?? pillarsOutput.parse(raw).subGoals;
+    c.expansions = plan ? planExpansions(plan) : {};
     c.doneActions = {};
     c.pillarContexts = {};
     c.stale = [];
   } else if (op === "pillar" && index !== undefined) {
-    c.subGoals[index] = (output as z.infer<typeof pillarOutput>).subGoal;
+    c.subGoals[index] = pillarOutput.parse(raw).subGoal;
     clearBranch(c, index);
     if (full) {
       c.expansions[index] = fullPillarOutput.parse(raw).actions;
@@ -189,9 +192,7 @@ export function applyCandidate(
     } else delete c.pillarContexts[String(index)];
   } else if (op === "expand" && index !== undefined) {
     clearBranch(c, index);
-    c.expansions[String(index)] = (
-      output as z.infer<typeof atomsOutput>
-    ).actions;
+    c.expansions[String(index)] = atomsOutput.parse(raw).actions;
     if (context) c.pillarContexts[String(index)] = context;
   }
   return c;

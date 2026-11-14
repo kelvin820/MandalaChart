@@ -91,6 +91,19 @@ test("採用整張重生才清除原子內容與檢核", () => {
   assert.equal(Object.keys(next.doneActions).length, 0);
   assert.equal(Object.keys(c.expansions).length, 8);
 });
+test("採用整張兩層生成時一次替換八組行動，原表可供復原", () => {
+  const original = demoChart();
+  original.doneActions["0:0"] = true;
+  const branches = original.subGoals.map((_, index) => ({
+    actions: original.expansions[index].map((item) => ({ ...item, title: "新：" + item.title })),
+  }));
+  const payload = { subGoals: original.subGoals, branches };
+  const next = applyCandidate(original, "all", payload, undefined, undefined, true);
+  assert.deepEqual(Object.values(next.expansions), branches.map(({ actions }) => actions));
+  assert.deepEqual(next.doneActions, {});
+  assert.equal(original.doneActions["0:0"], true);
+  assert.throws(() => applyCandidate(original, "all", { ...payload, branches: branches.slice(0, 7) }, undefined, undefined, true));
+});
 test("採用單分支展開保留其他分支、儲存局部條件", () => {
   const c = demoChart();
   c.stale = [0, 1];
