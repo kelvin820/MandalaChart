@@ -667,11 +667,17 @@ html:fullscreen body.world-immersive {
   overflow-y: auto;
 }
 .world-immersive .scene-title,
-.world-immersive .goal-label,
 .world-immersive .delivery-status,
 .world-immersive .scene-footer span,
 .world-immersive .legend {
   display: none;
+}
+.world-immersive .goal-label {
+  max-width: min(420px, calc(100% - 44px));
+  text-shadow: 0 1px 4px #101727, 0 0 10px #101727;
+}
+.world-immersive .goal-label strong {
+  display: block;
 }
 .world-immersive .scene-footer {
   bottom: 12px;
@@ -696,5 +702,8 @@ html:fullscreen body.world-immersive {
   }
   .world-immersive .workspace > aside {
     max-height: 45dvh;
+  }
+  .world-immersive .goal-label {
+    max-width: min(280px, calc(100% - 30px));
   }
 }
