@@ -30,7 +30,7 @@ await Promise.all([
 ]);
 if (vercel) {
   await build({ ...clientOptions, entryPoints: ["src/account-client.ts"], outfile: "dist/client/account.js" });
-  const key = process.env.CLERK_PUBLISHABLE_KEY;
+  const key = process.env.CLERK_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const inherited = key?.match(/^pk_(?:test|live)_(.+)$/)?.[1];
   const host = inherited ? Buffer.from(inherited, "base64").toString("utf8").replace(/\$$/, "") : "";
   if (key && !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(host))

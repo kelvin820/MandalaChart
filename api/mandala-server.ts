@@ -21,23 +21,24 @@ const files: FileStore | undefined = env.BLOB_STORE_ID || env.BLOB_READ_WRITE_TO
 } : undefined;
 
 function setup() {
-  const { TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY,
+  const { TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, CLERK_SECRET_KEY,
     MANDALA_TRIAL_SECRET, MANDALA_ORIGIN } = env;
-  if (!TURSO_DATABASE_URL || !TURSO_AUTH_TOKEN || !CLERK_PUBLISHABLE_KEY ||
+  const publishableKey = env.CLERK_PUBLISHABLE_KEY || env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  if (!TURSO_DATABASE_URL || !TURSO_AUTH_TOKEN || !publishableKey ||
       !CLERK_SECRET_KEY || !MANDALA_TRIAL_SECRET || MANDALA_TRIAL_SECRET.length < 32)
     return null;
   const deploymentUrl = env.VERCEL_ENV === "preview" ? env.VERCEL_URL : env.VERCEL_PROJECT_PRODUCTION_URL;
   const configured = MANDALA_ORIGIN || (deploymentUrl && "https://" + deploymentUrl);
   if (!configured) return null;
   const origin = new URL(configured).origin;
-  const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY, publishableKey: CLERK_PUBLISHABLE_KEY });
+  const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY, publishableKey });
   const db = createClient({ url: TURSO_DATABASE_URL, authToken: TURSO_AUTH_TOKEN });
   return cloudHandler({
     env,
     db,
     origin,
     files,
-    publishableKey: CLERK_PUBLISHABLE_KEY,
+    publishableKey,
     trialSecret: MANDALA_TRIAL_SECRET,
     async identity(request) {
       const state = await clerk.authenticateRequest(request, { authorizedParties: [origin] });
