@@ -22,7 +22,7 @@ const files: FileStore | undefined = env.BLOB_STORE_ID || env.BLOB_READ_WRITE_TO
 
 function setup() {
   const { TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, CLERK_SECRET_KEY,
-    MANDALA_TRIAL_SECRET, MANDALA_ORIGIN } = env;
+    MANDALA_TRIAL_SECRET, MANDALA_ORIGIN, MANDALA_PREVIEW_ORIGIN } = env;
   const publishableKey = env.CLERK_PUBLISHABLE_KEY || env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   if (!TURSO_DATABASE_URL || !TURSO_AUTH_TOKEN || !publishableKey ||
       !CLERK_SECRET_KEY || !MANDALA_TRIAL_SECRET || MANDALA_TRIAL_SECRET.length < 32)
@@ -30,10 +30,9 @@ function setup() {
   const deploymentUrl = env.VERCEL_ENV === "preview" ? env.VERCEL_URL : env.VERCEL_PROJECT_PRODUCTION_URL;
   const configured = MANDALA_ORIGIN || (deploymentUrl && "https://" + deploymentUrl);
   if (!configured) return null;
-  const origin = new URL(configured).origin;
   const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY, publishableKey });
   const db = createClient({ url: TURSO_DATABASE_URL, authToken: TURSO_AUTH_TOKEN });
-  return cloudHandler({
+  const handlerFor = (origin: string) => cloudHandler({
     env,
     db,
     origin,
@@ -53,6 +52,13 @@ function setup() {
       return { id, email };
     },
   });
+  const primary = handlerFor(new URL(configured).origin);
+  if (env.VERCEL_ENV !== "preview" || !MANDALA_PREVIEW_ORIGIN) return primary;
+
+  const previewOrigin = new URL(MANDALA_PREVIEW_ORIGIN).origin;
+  const preview = handlerFor(previewOrigin);
+  return (request: Request) =>
+    new URL(request.url).origin === previewOrigin ? preview(request) : primary(request);
 }
 
 const handle = setup();

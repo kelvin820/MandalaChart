@@ -4,7 +4,7 @@
 
 ## 現有測試站
 
-[Vercel 專案](https://vercel.com/ckm13/mandala-wishlands) 已連接 GitHub。推送 `codex/vercel-membership` 會建立新的 Preview。使用[分支的固定網址](https://mandala-wishlands-git-codex-vercel-membership-ckm13.vercel.app/)測試登入與付款返回，讓網址與 `MANDALA_ORIGIN` 一致。進站時需登入有權存取此專案的 Vercel 帳號。
+[Vercel 專案](https://vercel.com/ckm13/mandala-wishlands) 已連接 GitHub。推送 `codex/vercel-membership` 會建立新的 Preview。[wishlands.vercel.app](https://wishlands.vercel.app/) 是這個分支的短網址，在 Preview 設為 `MANDALA_PREVIEW_ORIGIN`。[原分支網址](https://mandala-wishlands-git-codex-vercel-membership-ckm13.vercel.app/) 對應 `MANDALA_ORIGIN`。兩個網址都可登入和生成目標。進站時需登入有權存取此專案的 Vercel 帳號。
 
 測試環境採用 `mandala-wishlands-test` 資料庫、私人 `mandala-wishlands-blob` 儲存和 `mandala-wishlands-auth` 的 Clerk 開發實例。Clerk 開發實例以 email 驗證碼註冊，測試帳號可用 [Clerk 的測試 email 與驗證碼](https://clerk.com/docs/guides/development/testing/test-emails-and-phones)，避免寄信給真實使用者。
 
@@ -12,7 +12,7 @@
 
 1. 在現有 Vercel 帳戶建立專案，選 GitHub 的 `kelvin820/MandalaChart`。部署本分支為 Preview。Framework Preset 使用 Other，建置及輸出目錄由 `vercel.json` 設定。
 2. 建立一個 Turso 測試資料庫，連接 Preview 環境。在有該資料庫連線變數的受控終端執行 `npm run db:vercel`。這個指令建立所需的表和索引，可重複執行。
-3. 建立 Clerk Development instance，開啟 Email 驗證碼。將 Publishable Key 與 Secret Key 設入 Preview，並在 Clerk 設定使用的網址。程式也會讀取 Clerk Marketplace 自動提供的 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`。新增 `MANDALA_ORIGIN` 時填入同一個 HTTPS origin，包含協定。預覽網址有別名時選定一個為測試入口。
+3. 建立 Clerk Development instance，開啟 Email 驗證碼。將 Publishable Key 與 Secret Key 設入 Preview，並在 Clerk 設定使用的網址。程式也會讀取 Clerk Marketplace 自動提供的 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`。在 `MANDALA_ORIGIN` 填入同一個 HTTPS 網址，包含協定。若也有綁定到同一分支的短網址，可在該分支的 Preview 設定中填入 `MANDALA_PREVIEW_ORIGIN`。
 4. 設定後端的 `NVIDIA_API_KEY`，並用密碼產生器建立至少 32 字元的 `MANDALA_TRIAL_SECRET`。同時設定獨立的 `CRON_SECRET`，供正式站的每日試用資料清理使用。連接 Private Blob 到 Preview，以測試會員的 PDF 下載。
 5. 在 [Polar Sandbox](https://sandbox.polar.sh/) 新增一個固定價格、單次付款的商品，例如「新增 1 個曼陀羅目標」。建立具 `checkouts:write` 權限的 Organization Access Token。把 `POLAR_SERVER` 設為 `sandbox`，再填入商品 ID、Access Token 與 Webhook Secret。
 6. 將 Polar 的 webhook 指向 `https://預覽網址/api/billing/webhook`，訂閱 `order.paid` 和 `order.refunded`。測試站如有部署保護，在 Vercel 開啟 [Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection#protection-bypass-for-automation)，把 `?x-vercel-protection-bypass=秘密值` 加在 Polar 後台的 webhook 網址。回呼內容會驗簽，也會比對網站已建立的訂單、商品及會員。
