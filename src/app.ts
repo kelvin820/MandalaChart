@@ -1323,9 +1323,24 @@ async function act(action: string, button: HTMLElement, keyboard = false) {
     if (!cloud?.publishableKey) return;
     const clerk = await bindAccount(cloud.publishableKey);
     if (dialog.open) dialog.close();
-    if (clerk.user) clerk.openUserProfile();
-    else if (action === "signUp") clerk.openSignUp();
+    if (clerk.user) {
+      show(modal("帳號", "", '<button type="button" data-action="accountProfile">管理帳號</button><button type="button" data-action="signOut">登出</button>'));
+    } else if (action === "signUp") clerk.openSignUp();
     else clerk.openSignIn();
+    return;
+  }
+  if (action === "accountProfile") {
+    if (dialog.open) dialog.close();
+    account?.openUserProfile();
+    return;
+  }
+  if (action === "signOut") {
+    button.setAttribute("disabled", "");
+    try {
+      await account?.signOut();
+    } finally {
+      button.removeAttribute("disabled");
+    }
     return;
   }
   if (action === "claimTrial") {
