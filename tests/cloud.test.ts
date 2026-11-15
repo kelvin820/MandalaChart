@@ -7,6 +7,66 @@ import { cloudHandler } from "../server/cloud.ts";
 import { demoChart } from "../src/demo.ts";
 import { makePrompt } from "../src/domain.ts";
 
+test("公開試用無須登入，不能寫入會員資料或收款，達到全站上限後不再呼叫 AI", async (t) => {
+  const db = createClient({ url: ":memory:" });
+  t.after(() => db.close());
+  for (const path of ["drizzle/0000_mandala.sql", "drizzle/vercel.sql"])
+    await db.executeMultiple(await readFile(path, "utf8"));
+  const origin = "https://wishlands.vercel.app";
+  let modelCalls = 0;
+  const app = cloudHandler({
+    db, origin, trialSecret: "test-trial-signing-key-for-public-mode",
+    env: {
+      NVIDIA_API_KEY: "fake-key",
+      POLAR_SERVER: "production",
+      POLAR_ACCESS_TOKEN: "mock-token",
+      POLAR_PRODUCT_ID: "mock-product",
+      POLAR_WEBHOOK_SECRET: "mock-secret",
+    },
+    generate: async () => {
+      modelCalls++;
+      const { subGoals, expansions } = demoChart();
+      return { subGoals, branches: Object.values(expansions).map((actions) => ({ actions })) };
+    },
+  });
+  const session = async () => {
+    const response = await app(new Request(origin + "/api/config"));
+    const config = await response.json() as Record<string, unknown>;
+    assert.equal(config.signedIn, false);
+    assert.equal(config.publishableKey, undefined);
+    assert.equal(config.checkoutReady, false);
+    assert.equal(config.modelReady, true);
+    return response.headers.get("set-cookie")!.split(";")[0];
+  };
+  const cookie = await session();
+  const generation = (guestCookie: string, source = origin) => {
+    const chart = demoChart();
+    return app(new Request(origin + "/api/generations", {
+      method: "POST",
+      headers: { cookie: guestCookie, origin: source, "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: chart.id, operation: "create", full: true, goal: chart.goal, ...makePrompt("create", chart) }),
+    }));
+  };
+  assert.equal((await generation(cookie, "https://other.example")).status, 403);
+  const trial = await generation(cookie);
+  assert.equal(trial.status, 200);
+  const { payload } = await trial.json() as { payload: { branches: { actions: unknown[] }[] } };
+  assert.equal(payload.branches.flatMap(({ actions }) => actions).length, 64);
+  assert.equal((await generation(cookie)).status, 409);
+  assert.equal((await app(new Request(origin + "/api/charts", {
+    method: "PUT", headers: { cookie, origin, Authorization: "Bearer fake-session" },
+    body: JSON.stringify({ chart: demoChart(), expected: null }),
+  }))).status, 401);
+  assert.equal((await app(new Request(origin + "/api/billing/checkout", { method: "POST", headers: { cookie, origin } }))).status, 401);
+  assert.equal((await app(new Request(origin + "/api/billing/webhook", { method: "POST" }))).status, 503);
+  await db.batch(Array.from({ length: 29 }, (_, i) => ({
+    sql: "INSERT INTO mandala_trial_jobs VALUES (?,?,?,?,?,?)",
+    args: [crypto.randomUUID(), `guest-${i}`, `network-${i}`, Date.now(), "succeeded", null],
+  })), "write");
+  assert.equal((await generation(await session())).status, 429);
+  assert.equal(modelCalls, 1);
+});
+
 test("Vercel rules: private charts, free goals, guest trial and signed one-time credits", async (t) => {
   const db = createClient({ url: ":memory:" });
   t.after(() => db.close());
@@ -17,7 +77,7 @@ test("Vercel rules: private charts, free goals, guest trial and signed one-time 
   const origin = "https://mandala.example";
   let modelCalls = 0;
   const app = cloudHandler({
-    db, origin, publishableKey: "pk_test_fake", trialSecret: "secret-used-only-for-the-test",
+    db, origin, trialSecret: "secret-used-only-for-the-test",
     env: {
       NVIDIA_API_KEY: "fake-key",
       POLAR_ACCESS_TOKEN: "mock-token",
@@ -25,9 +85,12 @@ test("Vercel rules: private charts, free goals, guest trial and signed one-time 
       POLAR_WEBHOOK_SECRET: secret,
       POLAR_SERVER: "sandbox",
     },
-    identity: async (request) => {
-      const user = request.headers.get("x-test-user");
-      return user ? { id: user } : null;
+    members: {
+      publishableKey: "pk_test_fake",
+      identity: async (request) => {
+        const user = request.headers.get("x-test-user");
+        return user ? { id: user } : null;
+      },
     },
     generate: async () => {
       modelCalls++;

@@ -10,14 +10,14 @@ import { generationSchema } from "../src/domain.ts";
 
 const trialCookie = "__Host-mandala-trial";
 const trialSeconds = 24 * 60 * 60;
+const publicDailyTrials = 30;
 type Member = { id: string; email?: string };
 type Options = {
   db: Client;
   env: BillingEnv & ModelEnv;
   origin: string;
-  publishableKey: string;
   trialSecret: string;
-  identity: (request: Request) => Promise<Member | null>;
+  members?: { publishableKey: string; identity: (request: Request) => Promise<Member | null> };
   files?: FileStore;
   generate?: Parameters<typeof api>[4];
 };
@@ -43,10 +43,10 @@ function cookieFor(id: string, secret: string) {
 
 export function cloudHandler(options: Options) {
   return async (request: Request): Promise<Response> => {
-    const { env, db, origin, trialSecret } = options;
+    const { env, db, origin, trialSecret, members } = options;
     try {
       const { pathname, searchParams } = new URL(request.url);
-      const billing = billingConfig(env);
+      const billing = members ? billingConfig(env) : null;
       if (pathname === "/api/billing/webhook" && request.method === "POST")
         return billing ? await polarWebhook(request, db, billing) : json({ error: "Billing unavailable" }, 503);
       if (pathname === "/api/maintenance" && request.method === "GET") {
@@ -62,17 +62,17 @@ export function cloudHandler(options: Options) {
       const source = request.headers.get("origin");
       if (request.method !== "GET" && source && source !== origin)
         return json({ error: "不允許跨來源操作。" }, 403);
-      const member = await options.identity(request);
+      const member = await members?.identity(request);
       const visitor = member ? null : trialId(request, trialSecret);
       if (pathname === "/api/config" && request.method === "GET") {
         const config = modelConfig(env);
         const response = json({
           mode: "vercel",
-          storage: "cloud",
+          storage: members ? "cloud" : "session",
           modelReady: !!config,
           provider: config?.provider ?? null,
           signedIn: !!member,
-          publishableKey: options.publishableKey,
+          publishableKey: members?.publishableKey,
           allowance: member ? await goalAllowance(db, member.id) : null,
           checkoutReady: !!billing,
           sandboxPayments: billing?.sandbox ?? false,
@@ -96,10 +96,13 @@ export function cloudHandler(options: Options) {
         const startTrial = generation?.full && generation.operation === "create";
         if (visitor && (startTrial || readTrial)) {
           const ip = request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-          const store = new CloudStore(db, { trialNetwork: digest(trialSecret, "network:" + ip) });
+          const store = new CloudStore(db, {
+            trialNetwork: digest(trialSecret, "network:" + ip),
+            dailyTrialLimit: members ? undefined : publicDailyTrials,
+          });
           return await api(request, env, store, "trial:" + visitor, options.generate);
         }
-        return json({ error: "請登入後繼續。", code: "SIGN_IN" }, 401);
+        return json({ error: members ? "請登入後繼續。" : "公開試用版不提供此操作。", code: "SIGN_IN" }, 401);
       }
       if (pathname === "/api/billing/checkout" && request.method === "POST") {
         if (!billing) return json({ error: "付款尚未開放。" }, 503);

@@ -7,6 +7,7 @@ type Database = Pick<Client | Transaction, "execute">;
 export const FREE_GOALS = 3;
 const minute = 60_000;
 const day = 24 * 60 * minute;
+type StoreOptions = { newGoal?: string; trialNetwork?: string; dailyTrialLimit?: number };
 
 function asD1(db: Database) {
   return {
@@ -52,9 +53,9 @@ function outOfGoals() {
 
 export class CloudStore extends D1Store {
   private readonly client: Client;
-  private readonly options: { newGoal?: string; trialNetwork?: string };
+  private readonly options: StoreOptions;
 
-  constructor(client: Client, options: { newGoal?: string; trialNetwork?: string } = {}) {
+  constructor(client: Client, options: StoreOptions = {}) {
     super(asD1(client));
     this.client = client;
     this.options = options;
@@ -113,9 +114,14 @@ export class CloudStore extends D1Store {
           args: [owner, now - 4 * minute, network, now - day],
         });
         if (Number(rows[0].trial))
-          throw new ApiProblem("訪客可體驗一個目標。註冊後即可繼續。", 409, "TRIAL_LIMIT");
+          throw new ApiProblem("每位訪客可試用一個目標。", 409, "TRIAL_LIMIT");
         if (Number(rows[0].attempts) >= 12)
-          throw new ApiProblem("訪客試用已達今日上限，請登入後繼續。", 429, "TRIAL_LIMIT");
+          throw new ApiProblem("今日試用名額已滿，請稍後再試。", 429, "TRIAL_LIMIT");
+        if (this.options.dailyTrialLimit !== undefined) {
+          const { rows: daily } = await tx.execute("SELECT COUNT(*) AS attempts FROM mandala_trial_jobs");
+          if (Number(daily[0].attempts) >= this.options.dailyTrialLimit)
+            throw new ApiProblem("今日試用名額已滿，請稍後再試。", 429, "TRIAL_LIMIT");
+        }
         const result = await tx.execute({
           sql: "INSERT OR IGNORE INTO mandala_trial_jobs VALUES (?,?,?,?,?,?)",
           args: [job.requestId, owner, network, job.createdAt, job.state, JSON.stringify(job)],

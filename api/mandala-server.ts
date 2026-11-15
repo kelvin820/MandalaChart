@@ -23,34 +23,41 @@ const files: FileStore | undefined = env.BLOB_STORE_ID || env.BLOB_READ_WRITE_TO
 function setup() {
   const { TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, CLERK_SECRET_KEY,
     MANDALA_TRIAL_SECRET, MANDALA_ORIGIN, MANDALA_PREVIEW_ORIGIN } = env;
+  const production = env.VERCEL_ENV === "production";
+  const trialOnly = production && env.MANDALA_PUBLIC_TRIAL_ONLY === "1";
   const publishableKey = env.CLERK_PUBLISHABLE_KEY || env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  if (!TURSO_DATABASE_URL || !TURSO_AUTH_TOKEN || !publishableKey ||
-      !CLERK_SECRET_KEY || !MANDALA_TRIAL_SECRET || MANDALA_TRIAL_SECRET.length < 32)
+  if (!TURSO_DATABASE_URL || !TURSO_AUTH_TOKEN || !MANDALA_TRIAL_SECRET || MANDALA_TRIAL_SECRET.length < 32)
+    return null;
+  const clerk = !trialOnly && publishableKey && CLERK_SECRET_KEY
+    ? createClerkClient({ secretKey: CLERK_SECRET_KEY, publishableKey }) : null;
+  if (!trialOnly && (!clerk || (production &&
+      (!publishableKey?.startsWith("pk_live_") || !CLERK_SECRET_KEY?.startsWith("sk_live_")))))
     return null;
   const deploymentUrl = env.VERCEL_ENV === "preview" ? env.VERCEL_URL : env.VERCEL_PROJECT_PRODUCTION_URL;
   const configured = MANDALA_ORIGIN || (deploymentUrl && "https://" + deploymentUrl);
   if (!configured) return null;
-  const clerk = createClerkClient({ secretKey: CLERK_SECRET_KEY, publishableKey });
   const db = createClient({ url: TURSO_DATABASE_URL, authToken: TURSO_AUTH_TOKEN });
   const handlerFor = (origin: string) => cloudHandler({
     env,
     db,
     origin,
     files,
-    publishableKey,
     trialSecret: MANDALA_TRIAL_SECRET,
-    async identity(request) {
-      const state = await clerk.authenticateRequest(request, { authorizedParties: [origin] });
-      const auth = state.toAuth();
-      const id = auth?.userId;
-      if (!id) return null;
-      if (new URL(request.url).pathname !== "/api/billing/checkout") return { id };
-      const user = await clerk.users.getUser(id).catch(() => null);
-      const email = user?.emailAddresses.find((item) =>
-        item.id === user.primaryEmailAddressId && item.verification?.status === "verified"
-      )?.emailAddress;
-      return { id, email };
-    },
+    members: clerk && publishableKey ? {
+      publishableKey,
+      async identity(request) {
+        const state = await clerk.authenticateRequest(request, { authorizedParties: [origin] });
+        const auth = state.toAuth();
+        const id = auth?.userId;
+        if (!id) return null;
+        if (new URL(request.url).pathname !== "/api/billing/checkout") return { id };
+        const user = await clerk.users.getUser(id).catch(() => null);
+        const email = user?.emailAddresses.find((item) =>
+          item.id === user.primaryEmailAddressId && item.verification?.status === "verified"
+        )?.emailAddress;
+        return { id, email };
+      },
+    } : undefined,
   });
   const primary = handlerFor(new URL(configured).origin);
   if (env.VERCEL_ENV !== "preview" || !MANDALA_PREVIEW_ORIGIN) return primary;

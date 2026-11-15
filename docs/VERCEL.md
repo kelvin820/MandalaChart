@@ -4,7 +4,9 @@
 
 ## 現有測試站
 
-[Vercel 專案](https://vercel.com/ckm13/mandala-wishlands) 已連接 GitHub。推送 `codex/vercel-membership` 會建立新的 Preview。[wishlands.vercel.app](https://wishlands.vercel.app/) 是這個分支的短網址，在 Preview 設為 `MANDALA_PREVIEW_ORIGIN`。[原分支網址](https://mandala-wishlands-git-codex-vercel-membership-ckm13.vercel.app/) 對應 `MANDALA_ORIGIN`。兩個網址都可登入和生成目標。進站時需登入有權存取此專案的 Vercel 帳號。
+[Vercel 專案](https://vercel.com/ckm13/mandala-wishlands) 已連接 GitHub。推送 `codex/vercel-membership` 會建立新的 Preview。[內部會員測試](https://mandala-wishlands-git-codex-vercel-membership-ckm13.vercel.app/) 仍需有專案存取權的 Vercel 帳號。
+
+公開試用以 [wishlands.vercel.app](https://wishlands.vercel.app/) 作為 Production 網域。Production 設定 `MANDALA_PUBLIC_TRIAL_ONLY=1`、`MANDALA_ORIGIN=https://wishlands.vercel.app`，並提供 Turso 連線、獨立的試用簽章及清理密鑰和後端 `NVIDIA_API_KEY`。不載入 Clerk 或 Polar；每位訪客可生成一張表，留在當前分頁。公開試用每 24 小時最多受理 30 次生成嘗試，避免消耗過量 AI 額度。開放會員時需準備 Clerk 正式憑證和自有網域，再取消訪客模式。
 
 測試環境採用 `mandala-wishlands-test` 資料庫、私人 `mandala-wishlands-blob` 儲存和 `mandala-wishlands-auth` 的 Clerk 開發實例。Clerk 開發實例以 email 驗證碼註冊，測試帳號可用 [Clerk 的測試 email 與驗證碼](https://clerk.com/docs/guides/development/testing/test-emails-and-phones)，避免寄信給真實使用者。
 

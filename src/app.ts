@@ -121,7 +121,7 @@ function trialApi(path: string, init?: RequestInit) {
   if (path === "/api/charts" && init?.method === "PUT") {
     const { chart: input, expected } = JSON.parse(String(init.body));
     const next = chartSchema.parse(input);
-    if (chart && chart.id !== next.id) throw new AppProblem("請註冊後建立更多目標。", "TRIAL_LIMIT");
+    if (chart && chart.id !== next.id) throw new AppProblem("每位訪客可試用一個目標。", "TRIAL_LIMIT");
     if (expected !== (chart?.revision ?? null)) throw Error("這份試用表已更新，請重新開啟。");
     const saved = { ...next, revision: chart ? chart.revision + 1 : 0, updatedAt: new Date().toISOString() };
     storeTrial(saved);
@@ -167,13 +167,15 @@ async function load() {
     '<div class="loading-page"><div class="spinner"></div>正在整理你的目標…</div>';
   try {
     let config = await api<AppConfig>("/api/config");
-    if (config.mode === "vercel" && config.publishableKey) {
-      try {
-        await bindAccount(config.publishableKey);
-        config = await api<AppConfig>("/api/config");
-      } catch {
-        // A failed Clerk connection still permits the anonymous trial.
-        config.signedIn = false;
+    if (config.mode === "vercel") {
+      if (config.publishableKey) {
+        try {
+          await bindAccount(config.publishableKey);
+          config = await api<AppConfig>("/api/config");
+        } catch {
+          // A failed Clerk connection still permits the anonymous trial.
+          config.signedIn = false;
+        }
       }
       if (revision !== loadRevision) return;
       cloud = config;
@@ -203,7 +205,7 @@ async function load() {
 }
 function render() {
   const button = $("#memberButton");
-  button.hidden = !cloud;
+  button.hidden = !cloud?.publishableKey;
   button.textContent = cloud?.signedIn ? "帳號" : "註冊／登入";
   if (current) renderChart();
   else renderHome();
@@ -212,6 +214,9 @@ function render() {
 function accountNotice() {
   if (!cloud) return "";
   if (guest()) {
+    if (!cloud.publishableKey) return `<div class="membership-card">
+      <p><strong>公開試用</strong>。可生成一張完整曼陀羅表；關閉分頁後不會保留。會員登入尚未開放。</p>
+    </div>`;
     return `<div class="membership-card">
       <p>訪客可試用一份完整目標，關閉分頁後不會保留。</p>
       <button type="button" data-action="signUp">免費註冊 · 保存目標</button>
@@ -225,8 +230,12 @@ function accountNotice() {
   </div>`;
 }
 
-function showLimit(code: string) {
+function showLimit(code: string, message?: string) {
   if (code === "TRIAL_LIMIT") {
+    if (cloud && !cloud.publishableKey) {
+      show(modal("公開試用", `<p>${escape(message || "每位訪客可試用一個目標。關閉分頁前，可以繼續編輯這張表。")}</p>`));
+      return;
+    }
     show(modal("註冊後繼續你的願望", "<p>訪客可試用一個目標。註冊後可建立三個目標，並在其他裝置接著做。</p>",
       '<button type="button" class="primary" data-action="signUp">免費註冊 ↗</button>'));
   } else {
@@ -829,7 +838,7 @@ async function startGeneration() {
       sessionStorage.removeItem("mandala-pending");
       pending = null;
       await refreshAllowance();
-      showLimit(e.code);
+      showLimit(e.code, e.message);
       return;
     }
     if (msg.includes("尚未完成模型") || msg.includes("生成頻率")) {
@@ -890,7 +899,9 @@ async function finishGeneration(payload: unknown) {
       undo = null;
       dialog.close();
       openChart(saved.id);
-      toast(guest() ? "已生成完整試用目標。註冊後可以保存。" : "已儲存八個支柱與六十四項行動。");
+      toast(guest()
+        ? cloud?.publishableKey ? "已生成完整試用目標。註冊後可以保存。" : "已生成完整試用目標。關閉分頁後不會保留。"
+        : "已儲存八個支柱與六十四項行動。");
     } else {
       if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
         await new Promise((resolve) => setTimeout(resolve, 450));
@@ -1741,7 +1752,7 @@ document.addEventListener("click", (e) => {
   if (!button || button.hasAttribute("disabled")) return;
   void act(button.dataset.action!, button, e.detail === 0).catch((e) => {
     if (e instanceof AppProblem && (e.code === "GOAL_LIMIT" || e.code === "TRIAL_LIMIT")) {
-      showLimit(e.code);
+    showLimit(e.code, e.message);
       return;
     }
     const msg = (e as Error).message || "操作未完成，請稍後重試。";
