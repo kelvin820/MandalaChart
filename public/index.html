@@ -8,9 +8,9 @@
     />
     <meta
       name="description"
-      content="把願望拆成八個支柱與可以開始的行動，在願望浮島點亮希望火炬。"
+      content="把願望拆成八個支柱與可以開始的行動，在灯火の八咫點亮希望火炬。"
     />
-    <title>願望之境｜曼陀羅目標教練</title>
+    <title>願いの曼陀羅｜曼陀羅目標教練</title>
     <meta name="theme-color" content="#111119" />
     <link rel="stylesheet" href="/theme.css" />
     <link rel="stylesheet" href="/style.css" />
@@ -26,12 +26,13 @@
           height="48"
           alt=""
         />
-        <span>願望之境<small>WISHLANDS</small></span>
+        <span lang="ja">願いの曼陀羅</span>
       </a>
-      <div class="header-right">
-        <span id="connection">正在連線…</span
-        ><button data-action="home" class="quiet">我的曼陀羅表</button>
-      </div>
+      <nav class="header-right" aria-label="主要導覽">
+        <span id="connection" role="status" data-state="loading">正在連線…</span>
+        <button type="button" data-action="home" class="nav-library">我的曼陀羅表</button>
+        <span class="account-avatar" role="img" aria-label="使用者頭像"></span>
+      </nav>
     </header>
     <main id="app"></main>
     <footer class="site-footer">
@@ -39,7 +40,7 @@
         <img src="/brand/chang-kai-mau.svg" width="32" height="32" alt="" />
         <span>設計與開發 · CHANG KAI MAU</span>
       </button>
-      <span>WISHLANDS · 2026</span>
+      <span>願いの曼陀羅</span>
     </footer>
     <div id="toast" role="status" aria-live="polite"></div>
     <dialog id="dialog"><div id="dialogContent"></div></dialog>

@@ -41,6 +41,7 @@ let charts: Chart[] = [],
   current: Chart | null = null,
   selected: number | null = null,
   actionIndex: number | null = null,
+  pillarDetailOpen = false,
   ready = false,
   loadError = "",
   draft = { goal: "", deadline: "", currentState: "", constraints: "" },
@@ -70,6 +71,9 @@ async function api<T = any>(path: string, init?: RequestInit): Promise<T> {
   return body;
 }
 async function load() {
+  const connection = $("#connection");
+  connection.dataset.state = "loading";
+  connection.textContent = "正在連線…";
   app.innerHTML =
     '<div class="loading-page"><div class="spinner"></div>正在整理你的目標…</div>';
   try {
@@ -79,13 +83,15 @@ async function load() {
     ]);
     ready = config.modelReady;
     charts = list.charts;
-    $("#connection").textContent = ready
+    connection.dataset.state = ready ? "ready" : "pending";
+    connection.textContent = ready
       ? config.provider === "nvidia" ? "NVIDIA AI 已設定" : "AI 已設定"
       : "AI 尚待連線";
     loadError = "";
   } catch (e) {
     loadError = (e as Error).message;
-    $("#connection").textContent = "連線待確認";
+    connection.dataset.state = "error";
+    connection.textContent = "連線待確認";
   }
   const id = location.hash.slice(1);
   current = charts.find((c) => c.id === id) ?? null;
@@ -107,30 +113,70 @@ function readContext(prefix: string): Context {
   });
 }
 function renderHome() {
-  app.innerHTML = `<section class="hero"><div class="hero-copy"><h1>從一個願望，<br><em>走出下一步。</em></h1><p>把願望拆成八個支柱，找出今天就能做的事。每勾選一項完成的行動，願望浮島的希望火炬就會更亮。</p><div class="hero-actions"><button data-action="focusGoal">開始寫下目標 <span aria-hidden="true">↓</span></button><button data-action="demo" class="hero-demo" ${loadError ? "disabled" : ""}>看看範例 <span aria-hidden="true">↗</span></button></div></div><mandala-preview class="hero-art" aria-hidden="true"></mandala-preview></section>${loadError ? `<div class="error-banner" role="alert">${escape(loadError)} <button data-action="reload">重新連線</button></div>` : ""}<div class="home-layout"><section class="panel"><div class="panel-heading"><h2>你的終極目標</h2><span class="step">01 / DEFINE</span></div><form id="createForm"><label class="field"><span class="label">你想實現什麼？</span><textarea id="goalInput" class="goal-input" maxlength="200" required placeholder="例如：一年後，能自信地用英文完成工作簡報">${escape(draft.goal)}</textarea><span class="char-count">不必一次想完整，先寫下你想去的方向。</span></label><div class="examples">${examples.map((s, i) => `<button type="button" data-action="example" data-index="${i}">${escape(s)}</button>`).join("")}</div><details class="context"><summary>＋ 加上期限、起點與限制，讓拆解更貼近你</summary>${contextFields("home", draft)}</details><div class="submit-row"><button class="primary" type="submit" ${loadError ? "disabled" : ""}>${ready ? "一鍵生成完整曼陀羅表 ↗" : "開始拆解目標 ↗"}</button><small>${ready ? "八個支柱 · 六十四項行動" : "可匯入外部 AI 的結果"}</small></div></form></section><aside class="home-side"><div class="eyebrow">A THOUGHTFUL WAY FORWARD</div><div class="steps">${[
-    ["先說清楚想要什麼", "目標、起點與限制，都是拆解的依據。"],
-    ["找到支持它的八個支柱", "能力、習慣、資源，都可以是一塊拼圖。"],
-    ["拆成真正能開始的一步", "逐格展開，調整到適合自己的大小。"],
-  ]
-    .map(
-      (s, i) =>
-        `<div class="step-item"><span>0${i + 1}</span><div><strong>${s[0]}</strong><p>${s[1]}</p></div></div>`,
-    )
-    .join(
-      "",
-    )}</div><button data-action="demo" class="full-width" ${loadError ? "disabled" : ""}>先試用一張已填範例 ↗</button><div class="side-quote">「有方向的微小行動，<br>也值得被看見。」<span>BUILD YOUR OWN POSSIBILITY.</span></div></aside></div><section class="list-section"><div class="list-head"><h2>我的曼陀羅表 <span class="step">${String(charts.length).padStart(2, "0")}</span></h2><div class="inline-buttons"><button class="quiet" data-action="demo" ${loadError ? "disabled" : ""}>試用範例</button><button class="quiet" data-action="import">匯入備份</button><a class="quiet button-link" href="/api/backup.json" target="_blank" rel="noopener">備份全部 ↓</a></div></div>${
-    charts.length
-      ? `<div class="saved-list">${charts
-          .slice()
-          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-          .map((c) => {
-            const n = Object.keys(c.expansions).length,
-              d = Object.values(c.doneActions).filter(Boolean).length;
-            return `<button class="saved-card" data-action="open" data-id="${c.id}"><div class="panel-heading" style="margin:0"><strong>${escape(c.goal)}</strong><time>${new Date(c.updatedAt).toLocaleDateString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric" })}</time></div><span class="summary">${c.subGoals.map((p) => escape(p.title)).join(" · ")}</span><span class="badges"><span class="badge">已展開 ${n}/8</span>${n ? `<span class="badge warm">已檢核 ${d}/${n * 8}</span>` : ""}${c.deadline ? `<span class="badge">${escape(c.deadline)}</span>` : ""}</span></button>`;
-          })
-          .join("")}</div>`
-      : '<div class="empty">還沒有建立目標。先寫下一個願望，或試用一張已填範例。</div>'
-  }</section>`;
+  const disabled = loadError ? "disabled" : "";
+  const steps = [
+    ["先說清楚想要什麼", "寫下目標，視需要補充期限、起點與限制。"],
+    ["找出八個支柱", "從不同方向找出支持目標的能力、習慣與資源。"],
+    ["拆成可以開始的行動", "每個支柱各有八項行動，可以逐一檢核。"],
+  ];
+  app.innerHTML = `
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>從一個願望，<br><em>走出下一步。</em></h1>
+        <p>把願望拆成八個方向，找出今天就能做的事。每完成一項行動，便為中央火炬添一分微光。</p>
+        <div class="hero-actions">
+          <button type="button" class="hero-primary" data-action="focusGoal">開始寫下目標 <span aria-hidden="true">↓</span></button>
+          <button type="button" class="hero-demo" data-action="demo" ${disabled}>看看範例 <span aria-hidden="true">↗</span></button>
+        </div>
+      </div>
+      <mandala-preview class="hero-art" aria-hidden="true"></mandala-preview>
+    </section>
+    ${loadError ? `<div class="error-banner" role="alert">${escape(loadError)} <button data-action="reload">重新連線</button></div>` : ""}
+    <div class="home-layout">
+      <section class="panel goal-panel" aria-labelledby="goalFormTitle">
+        <h2 id="goalFormTitle" class="panel-heading">你的終極目標</h2>
+        <form id="createForm">
+          <label class="field">
+            <span class="label">你想實現什麼？</span>
+            <textarea id="goalInput" class="goal-input" maxlength="200" required placeholder="例如：一年後，能自信地用英文完成工作簡報">${escape(draft.goal)}</textarea>
+          </label>
+          <div class="examples" aria-label="目標範例" role="group">
+            ${examples.map((goal, i) => `<button type="button" data-action="example" data-index="${i}">${escape(goal)}</button>`).join("")}
+          </div>
+          <details class="context">
+            <summary>＋ 加上期限、起點與限制，讓拆解更貼近你</summary>
+            ${contextFields("home", draft)}
+          </details>
+          <div class="submit-row">
+            <small>${ready ? "八個支柱 · 六十四項行動" : "可匯入外部 AI 的結果"}</small>
+            <button class="primary" type="submit" ${disabled}>${ready ? "一鍵生成完整曼陀羅表 ↗" : "開始拆解目標 ↗"}</button>
+          </div>
+        </form>
+      </section>
+      <aside class="home-side" aria-labelledby="stepsTitle">
+        <h2 id="stepsTitle">目標拆解流程</h2>
+        <ol class="steps" role="list">
+          ${steps.map(([title, text], i) => `
+            <li class="step-item">
+              <span aria-hidden="true">0${i + 1}</span>
+              <div><strong>${title}</strong><p>${text}</p></div>
+            </li>`).join("")}
+        </ol>
+      </aside>
+    </div>
+    <section class="list-section" id="my-charts" aria-labelledby="chartsTitle">
+      <div class="list-head">
+        <h2 id="chartsTitle" tabindex="-1">我的曼陀羅表 <span class="step">${charts.length} 張</span></h2>
+        <div class="inline-buttons">
+          <button class="quiet" data-action="demo" ${disabled}>試用範例</button>
+          <button class="quiet" data-action="import">匯入備份</button>
+          <a class="quiet button-link" href="/api/backup.json" target="_blank" rel="noopener">備份全部 ↓</a>
+        </div>
+      </div>
+      ${charts.length
+        ? `<div class="saved-list">${[...charts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(renderSavedCard).join("")}</div>`
+        : '<div class="empty">還沒有建立目標。先寫下一個願望，或試用一張已填範例。</div>'}
+    </section>`;
   $("#createForm").onsubmit = (e) => {
     e.preventDefault();
     draft = {
@@ -143,24 +189,92 @@ function renderHome() {
   $("#goalInput").oninput = () =>
     (draft.goal = $<HTMLTextAreaElement>("#goalInput").value);
 }
+
 function progress(c: Chart) {
+  const branches = c.subGoals.map((_, index) => {
+    const actions = c.expansions[index] ?? [];
+    return {
+      total: actions.length,
+      done: actions.filter((_, action) => c.doneActions[`${index}:${action}`]).length,
+      stale: c.stale.includes(index),
+    };
+  });
   return {
-    expanded: Object.keys(c.expansions).length,
-    total: Object.values(c.expansions).reduce((a, b) => a + b.length, 0),
-    done: Object.values(c.doneActions).filter(Boolean).length,
+    branches,
+    expanded: branches.filter((branch) => branch.total).length,
+    done: branches.reduce((sum, branch) => sum + branch.done, 0),
   };
 }
+
+const chartDate = new Intl.DateTimeFormat("zh-TW", {
+  timeZone: "Asia/Taipei",
+  month: "numeric",
+  day: "numeric",
+});
+
+function savedMetric(label: string, value: number, max: number, kind: string) {
+  return `<span class="saved-metric" data-kind="${kind}">
+    <span class="saved-metric-label">${label} <b>${value} / ${max}</b></span>
+    <span class="progress-track" aria-hidden="true"><i style="width:${value / max * 100}%"></i></span>
+  </span>`;
+}
+
+function renderSavedCard(c: Chart) {
+  const { done, expanded } = progress(c);
+  const isRecent = Date.now() - Date.parse(c.createdAt) < 86_400_000;
+  let status = "ready";
+  let label = "待開始";
+  if (c.stale.length) {
+    status = "review";
+    label = "待確認";
+  } else if (done === 64) {
+    status = "complete";
+    label = "已完成";
+  } else if (done > 0) {
+    status = "active";
+    label = "進行中";
+  } else if (isRecent) {
+    status = "new";
+    label = "剛建立";
+  }
+  return `<button type="button" class="saved-card" data-action="open" data-id="${c.id}" data-status="${status}">
+    <span class="saved-card-kicker">
+      <span class="saved-state">${label}</span>
+      <time datetime="${c.updatedAt}" title="最後更新">${chartDate.format(new Date(c.updatedAt))}</time>
+    </span>
+    <strong>${escape(c.goal)}</strong>
+    <span class="saved-progress">
+      ${savedMetric("支柱展開", expanded, 8, "pillars")}
+      ${savedMetric("行動完成", done, 64, "actions")}
+    </span>
+    ${c.deadline ? `<span class="saved-deadline">期限 ${escape(c.deadline)}</span>` : ""}
+  </button>`;
+}
+
+type BranchProgress = ReturnType<typeof progress>["branches"];
 let previousStructure: { id: string; confirmed: boolean[] } | undefined;
-function structureProgress(chart: Chart) {
-  const confirmed = chart.subGoals.map((_, index) =>
-    !!chart.expansions[index] && !chart.stale.includes(index),
-  );
+
+function structureProgress(chart: Chart, branches: BranchProgress) {
+  const confirmed = branches.map(({ total, stale }) => total > 0 && !stale);
   const previous = previousStructure?.id === chart.id ? previousStructure.confirmed : confirmed;
   previousStructure = { id: chart.id, confirmed };
-  const pillars = confirmed.map((ready, index) =>
-    `<i class="${ready ? "ready" : ""} ${ready && !previous[index] ? "raised" : ""}"></i>`,
-  );
-  return `<div class="structure-progress"><div class="structure-pillars" aria-hidden="true">${pillars.join("")}</div><p>已確認 ${confirmed.filter(Boolean).length} / 8 個支柱</p></div>`;
+  const cells = POS.map((index) => {
+    if (index === -1) return '<li class="heatmap-core" aria-hidden="true"><span></span></li>';
+    const { total, done, stale } = branches[index];
+    const label = stale ? "待確認" : total ? `${done}/8` : "未展開";
+    const state = stale ? "review" : total ? "ready" : "waiting";
+    const detail = `${chart.subGoals[index].title}，${total ? `完成 ${done} / 8 項行動${stale ? "，支柱待確認" : ""}` : "未展開"}`;
+    return `<li class="heatmap-cell${confirmed[index] && !previous[index] ? " raised" : ""}" data-state="${state}"
+      style="--heat: ${10 + done / 8 * 90}%" title="${escape(detail)}">
+      <span class="sr-only">${escape(detail)}</span>
+      <span aria-hidden="true">0${index + 1}</span>
+      <b aria-hidden="true">${label}</b>
+    </li>`;
+  });
+  return `<div class="structure-progress">
+    <div class="heatmap-heading"><h3>支柱進度</h3><p>已確認 ${confirmed.filter(Boolean).length} / 8 個支柱</p></div>
+    <ol class="structure-pillars" aria-label="八個支柱與行動完成數" role="list">${cells.join("")}</ol>
+  </div>`;
 }
 function renderChart() {
   const c = current!,
@@ -174,7 +288,19 @@ function renderChart() {
       .filter((s) => s[1])
       .map((s) => `<span>${s[0]}：${escape(s[1])}</span>`)
       .join("") || "<span>尚未設定定位資訊，可隨時編輯目標補充。</span>"
-  }</div></div><div class="chart-progress"><div>支柱展開 ${p.expanded}/8　·　行動檢核 ${p.done}/${p.total}</div><div class="progress-track"><i style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></i></div></div></div>${c.stale.length ? '<div class="stale-warning">上層目標或支柱已修改，部分行動需要重新檢查。舊內容仍保留，確認適用或重新生成後即可更新。</div>' : ""}<div class="chart-layout"><section>${selected !== null ? '<div id="branchArea"></div>' : wholeBoard ? renderWholeBoard(c) : overviewGrid(c)}</section><aside class="chart-aside"><h3>讓目標有根基。</h3><p>八個支柱是起點，不是唯一答案。你可以編輯、換個切入點，再慢慢拆到適合自己的大小。</p>${structureProgress(c)}<div class="divider"></div><button data-action="export">匯出曼陀羅表 ↗</button><button data-action="worlds" ${p.expanded < 8 || c.stale.length ? "disabled" : ""}>前往我的願望浮島 ↗</button><p class="note" style="margin-top:12px">${p.expanded < 8 ? "完成八個支柱的拆解後，讓整張表長成立體模型。" : c.stale.length ? "先檢查更新後的行動，再檢視立體成果。" : "結構已建立。到願望浮島查看每項行動的進度。"}</p></aside></div>`;
+  }</div></div><div class="chart-progress"><div>支柱展開 ${p.expanded}/8　·　行動檢核 ${p.done}/64</div><div class="progress-track"><i style="width:${p.done / 64 * 100}%"></i></div></div></div>
+    ${c.stale.length ? '<div class="stale-warning">上層目標或支柱已修改，部分行動需要重新檢查。舊內容仍保留，確認適用或重新生成後即可更新。</div>' : ""}
+    <div class="chart-layout">
+      <section>${selected !== null ? '<div id="branchArea"></div>' : wholeBoard ? renderWholeBoard(c) : overviewGrid(c, p.branches)}</section>
+      <aside class="chart-aside">
+        ${structureProgress(c, p.branches)}
+        <div class="chart-aside-actions">
+          <button data-action="export">匯出曼陀羅表 ↗</button>
+          <button data-action="worlds" ${p.expanded < 8 || c.stale.length ? "disabled" : ""}>前往灯火の八咫 ↗</button>
+        </div>
+        ${p.expanded < 8 || c.stale.length ? `<p class="note">${p.expanded < 8 ? "展開八個支柱後，即可前往 3D 浮島。" : "先確認修改過的支柱，再前往浮島。"}</p>` : ""}
+      </aside>
+    </div>`;
   renderBranch();
 }
 let wholeBoard = false;
@@ -209,8 +335,25 @@ function renderWholeBoard(chart: Chart) {
   }).join("")}</div>`;
 }
 
-function overviewGrid(c: Chart) {
-  return `<div class="grid" aria-label="第一層曼陀羅九宮格">${POS.map((i) => (i === -1 ? `<button class="cell center core-goal" data-action="wholeBoard" aria-expanded="false"><small>終極目標</small><strong>${escape(c.goal)}</strong><small>展開完整表 ↗</small></button>` : `<button class="cell ${selected === i ? "selected" : ""}" data-action="selectPillar" data-index="${i}" aria-pressed="${selected === i}"><span class="cell-number">PILLAR 0${i + 1}</span><strong>${escape(c.subGoals[i].title)}</strong><p>${escape(c.subGoals[i].actionHint)}</p><small>${c.expansions[i] ? `${c.stale.includes(i) ? "待檢查 · " : ""}已展開 · ${Object.keys(c.doneActions).filter((k) => k.startsWith(i + ":") && c.doneActions[k]).length}/8 已檢核` : "點選，補充條件與展開 ↗"}</small></button>`)).join("")}</div><p class="section-caption">點選一個支柱，找出支持它的八項原子行動或能力。</p>`;
+function overviewGrid(c: Chart, branches: BranchProgress) {
+  const cells = POS.map((i) => {
+    if (i === -1) return `
+      <button class="cell center core-goal" data-action="wholeBoard" aria-expanded="false">
+        <small>終極目標</small>
+        <strong>${escape(c.goal)}</strong>
+        <small>展開完整表 ↗</small>
+      </button>`;
+    const pillar = c.subGoals[i];
+    const { total, done, stale } = branches[i];
+    const status = stale ? "待確認" : total ? `${done}/8 已檢核` : "尚未展開";
+    return `<button class="cell" data-action="selectPillar" data-index="${i}">
+      <span class="cell-number">支柱 0${i + 1}</span>
+      <strong>${escape(pillar.title)}</strong>
+      <span class="cell-description">${escape(pillar.description || pillar.actionHint)}</span>
+      <small>${status} <span aria-hidden="true">↗</span></small>
+    </button>`;
+  });
+  return `<div class="grid overview-grid" role="group" aria-label="第一層曼陀羅九宮格">${cells.join("")}</div>`;
 }
 function renderBranch() {
   if (selected === null) return;
@@ -230,23 +373,72 @@ function renderBranch() {
     : `<button type="button" class="cell center" data-action="expand"><small>PILLAR 0${i + 1}</small><strong>${escape(p.title)}</strong><small>展開八項行動 ↗</small></button>`;
   const grid = atoms ? `<div class="grid" aria-label="第二層原子行動九宮格">${POS.map((j) => (j === -1 ? center : `<button class="cell ${actionIndex === j ? "selected" : ""} ${c.doneActions[i + ":" + j] ? "completed" : ""}" data-action="selectAtom" data-index="${j}" aria-controls="atomDetail" aria-expanded="${actionIndex === j}"><span class="cell-number">0${j + 1} / ${atoms[j].kind === "capability" ? "原子能力" : "原子行動"}</span><strong>${escape(atoms[j].title)}</strong><p>${escape(atoms[j].detail)}</p><small>${c.doneActions[i + ":" + j] ? "✓ 已檢核" : "檢視做法與完成標準 ↗"}</small></button>`)).join("")}</div>` : `<div class="grid" aria-label="尚未展開的行動九宮格">${POS.map((j) => j === -1 ? center : '<div class="cell empty-atom" aria-hidden="true"></div>').join("")}</div>`;
   const mini = `<button class="overview-mini" data-action="collapse" aria-label="返回第一層曼陀羅九宮格"><span class="mini-grid" aria-hidden="true">${POS.map((j) => `<i class="${j === i ? "mini-active" : j === -1 ? "mini-center" : ""}"></i>`).join("")}</span><span>返回總覽</span></button>`;
-  el.innerHTML = `<section class="branch" id="branch"><div class="branch-board">${grid}<div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div></div>${atoms ? '<aside id="atomDetail" class="atom-panel" aria-labelledby="atomDetailTitle" hidden></aside>' : ""}<div class="branch-head"><div><h2>${escape(p.title)}</h2><p>${escape(p.description)}</p><p class="note">參考行動：${escape(p.actionHint)}</p></div></div><div class="branch-controls"><button data-action="editPillar">編輯這一格</button><button data-action="regenPillar">重新生成此支柱</button></div><div class="local-context"><h4>為這個支柱補充條件</h4><p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>${contextFields("pillar", ctx, true)}<div class="inline-buttons"><button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button><button data-action="saveContext">儲存支柱條件</button></div></div>${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}</section>`;
+  el.innerHTML = `
+    <section class="branch" id="branch">
+      <div class="branch-board">
+        ${grid}
+        <div class="overview-dock" data-column="${anchor % 3}" data-row="${Math.floor(anchor / 3)}">${mini}</div>
+      </div>
+      <aside id="pillarDetail" class="detail-panel pillar-panel" aria-labelledby="pillarDetailTitle" ${pillarDetailOpen ? "" : "hidden"}>
+        <div class="detail-panel-heading">
+          <span class="badge">支柱 0${i + 1}</span>
+          <button type="button" class="detail-panel-close" data-action="closePillarDetail" aria-label="關閉支柱說明">×</button>
+          <h3 id="pillarDetailTitle" tabindex="-1">${escape(p.title)}</h3>
+        </div>
+        <div class="detail-panel-body">
+          ${p.description ? `<h4>與目標的關聯</h4><p>${escape(p.description)}</p>` : ""}
+          ${p.actionHint ? `<div class="criterion"><b>可以先這樣做</b>${escape(p.actionHint)}</div>` : ""}
+        </div>
+      </aside>
+      ${atoms ? '<aside id="atomDetail" class="detail-panel" aria-labelledby="atomDetailTitle" hidden></aside>' : ""}
+      <div class="branch-controls">
+        <button type="button" data-action="showPillarDetail" aria-controls="pillarDetail" aria-expanded="${pillarDetailOpen}">查看支柱說明</button>
+        <button data-action="editPillar">編輯支柱</button>
+        <button data-action="regenPillar">重新生成此支柱</button>
+      </div>
+      <div class="local-context">
+        <h4>為這個支柱補充條件</h4>
+        <p>留空會沿用終極目標的設定。局部條件會和整體限制一起交給 AI 分析。</p>
+        ${contextFields("pillar", ctx, true)}
+        <div class="inline-buttons">
+          <button class="primary" data-action="expand">${atoms ? "重新拆解八項內容" : "展開八項原子行動／能力"} ↗</button>
+          <button data-action="saveContext">儲存支柱條件</button>
+        </div>
+      </div>
+      ${c.stale.includes(i) ? '<div class="stale-warning">這個支柱的上層內容已更新。請重新檢查下面的行動是否仍適用。 <button data-action="reviewed">已檢查，保留這些行動</button></div>' : ""}
+    </section>`;
   if (atoms) renderAtom();
+  if (pillarDetailOpen) positionDetailPanel();
 }
 
-function positionAtomDetail() {
-  const panel = document.querySelector<HTMLElement>("#atomDetail:not([hidden])");
+function positionDetailPanel() {
+  const panel = document.querySelector<HTMLElement>(".detail-panel:not([hidden])");
   if (!panel) return;
   if (matchMedia("(max-width: 760px)").matches) {
     panel.removeAttribute("style");
     return;
   }
   const rail = $(".chart-aside").getBoundingClientRect();
-  const cell = $(".branch-board .cell.selected").getBoundingClientRect();
+  const anchor = $(panel.id === "atomDetail" ? ".branch-board .cell.selected" : "#branchArea").getBoundingClientRect();
   const bottom = document.documentElement.clientHeight - 16;
   panel.style.left = `${rail.left}px`;
   panel.style.width = `${rail.width}px`;
-  panel.style.top = `${Math.max(16, Math.min(cell.top, bottom - panel.offsetHeight))}px`;
+  panel.style.top = `${Math.max(16, Math.min(anchor.top, bottom - panel.offsetHeight))}px`;
+}
+
+function setPillarDetail(open: boolean) {
+  pillarDetailOpen = open;
+  $("#pillarDetail").hidden = !open;
+  $("[data-action=showPillarDetail]").setAttribute("aria-expanded", String(open));
+  if (open) positionDetailPanel();
+}
+
+function closePillarDetail() {
+  setPillarDetail(false);
+  const trigger = $("[data-action=showPillarDetail]");
+  const rect = trigger.getBoundingClientRect();
+  const target = rect.top >= 0 && rect.bottom <= window.innerHeight ? trigger : $(".overview-mini");
+  target.focus({ preventScroll: true });
 }
 
 function renderAtom() {
@@ -265,22 +457,22 @@ function renderAtom() {
   const atom = c.expansions[selected][actionIndex];
   const done = !!c.doneActions[selected + ":" + actionIndex];
   panel.innerHTML = `
-    <div class="atom-panel-heading">
+    <div class="detail-panel-heading">
       <span class="badge">${atom.kind === "capability" ? "原子能力" : "原子行動"}</span>
-      <button type="button" class="atom-panel-close" data-action="closeAtom" aria-label="關閉行動詳情">×</button>
+      <button type="button" class="detail-panel-close" data-action="closeAtom" aria-label="關閉行動詳情">×</button>
       <h3 id="atomDetailTitle" tabindex="-1">${escape(atom.title)}</h3>
     </div>
-    <div class="atom-panel-body">
+    <div class="detail-panel-body">
       <h4>具體做法</h4>
       <p>${escape(atom.detail)}</p>
       <div class="criterion"><b>${atom.kind === "capability" ? "驗證標準" : "完成標準"}</b>${escape(atom.criterion)}</div>
     </div>
-    <div class="atom-panel-actions">
+    <div class="detail-panel-actions">
       <button type="button" data-action="toggleDone" class="${done ? "" : "amber"}" aria-pressed="${done}">${done ? "取消完成標記" : "✓ 標記完成"}</button>
       <button type="button" data-action="editAtom">編輯內容</button>
     </div>`;
   panel.hidden = false;
-  positionAtomDetail();
+  positionDetailPanel();
 }
 
 function closeAtomDetail() {
@@ -316,6 +508,8 @@ async function saveChart(c: Chart, expected: number | null = c.revision) {
 }
 function goHome() {
   wholeBoard = false;
+  pillarDetailOpen = false;
+  actionIndex = null;
   if (current) {
     current = null;
     selected = null;
@@ -325,6 +519,7 @@ function goHome() {
 }
 function openChart(id: string) {
   wholeBoard = false;
+  pillarDetailOpen = false;
   current = charts.find((c) => c.id === id) ?? null;
   selected = null;
   actionIndex = null;
@@ -935,7 +1130,9 @@ async function act(action: string, button: HTMLElement, keyboard = false) {
     return;
   }
   if (action === "home") {
-    goHome();
+    if (current) goHome();
+    document.getElementById("chartsTitle")?.focus({ preventScroll: true });
+    document.getElementById("my-charts")?.scrollIntoView({ block: "start" });
     return;
   }
   if (action === "reload") {
@@ -974,10 +1171,11 @@ async function act(action: string, button: HTMLElement, keyboard = false) {
     const from = $(".chart-layout .grid").getBoundingClientRect();
     selected = Number(button.dataset.index);
     actionIndex = null;
+    pillarDetailOpen = true;
     renderChart();
     const mini = $(".overview-mini");
     animateBoard(mini, from);
-    mini.focus({ preventScroll: true });
+    (keyboard ? $("#pillarDetailTitle") : mini).focus({ preventScroll: true });
     return;
   }
   if (action === "collapse") {
@@ -985,12 +1183,27 @@ async function act(action: string, button: HTMLElement, keyboard = false) {
     const index = selected;
     selected = null;
     actionIndex = null;
+    pillarDetailOpen = false;
     renderChart();
     animateBoard($(".chart-layout .grid"), from);
     $(`[data-action="selectPillar"][data-index="${index}"]`).focus({ preventScroll: true });
     return;
   }
+  if (action === "showPillarDetail") {
+    if (actionIndex !== null) {
+      actionIndex = null;
+      renderAtom();
+    }
+    setPillarDetail(true);
+    if (keyboard) $("#pillarDetailTitle").focus({ preventScroll: true });
+    return;
+  }
+  if (action === "closePillarDetail") {
+    closePillarDetail();
+    return;
+  }
   if (action === "selectAtom") {
+    setPillarDetail(false);
     actionIndex = Number(button.dataset.index);
     renderAtom();
     if (keyboard) $("#atomDetailTitle").focus({ preventScroll: true });
@@ -1259,12 +1472,15 @@ document.addEventListener("click", (e) => {
     }
   });
 });
-window.addEventListener("resize", positionAtomDetail);
-window.addEventListener("scroll", positionAtomDetail, { passive: true });
+window.addEventListener("resize", positionDetailPanel);
+window.addEventListener("scroll", positionDetailPanel, { passive: true });
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape" || dialog.open || !document.querySelector("#atomDetail:not([hidden])")) return;
+  if (event.key !== "Escape" || dialog.open) return;
+  const panel = document.querySelector(".detail-panel:not([hidden])");
+  if (!panel) return;
   event.preventDefault();
-  closeAtomDetail();
+  if (panel.id === "atomDetail") closeAtomDetail();
+  else closePillarDetail();
 });
 dialog.addEventListener("cancel", () => {
   if (pending && !sessionStorage.getItem("mandala-pending")) {

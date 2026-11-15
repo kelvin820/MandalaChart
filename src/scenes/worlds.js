@@ -1,9 +1,11 @@
 import { mountStage } from "./stage.js";
 import { workshops, woods } from "./timber-islands.js";
 import { chartSchema } from "../domain.ts";
+import { makePostcard } from "./postcard.js";
 
 const $ = (selector) => document.querySelector(selector);
 const chartId = new URLSearchParams(location.search).get("chart");
+const defaultIslandName = "灯火の八咫";
 let chart = null;
 const colors = [
   "#7e8eb5",
@@ -130,7 +132,7 @@ async function readWorld() {
   const workspace = $(".workspace");
   workspace.hidden = true;
   status.hidden = false;
-  status.textContent = "正在載入你的願望浮島…";
+  status.textContent = "正在載入你的灯火の八咫…";
   try {
     if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(chartId))
       throw new Error("找不到指定的曼陀羅表。");
@@ -160,7 +162,7 @@ async function readWorld() {
   } catch (error) {
     status.textContent =
       error instanceof TypeError || error.name === "TimeoutError"
-        ? "目前無法載入願望浮島，請重新整理後再試。"
+        ? "目前無法載入灯火の八咫，請重新整理後再試。"
         : error.message;
     return null;
   }
@@ -173,12 +175,14 @@ let selected = 0;
 let saving = false;
 let auto = false;
 const canvas = $("#scene");
+let islandName = chart?.islandName ?? "";
 let showLabels = true;
 let hoveredIsland = -1;
 let labelPositions = [];
 if (data) {
   $("#goal").textContent = data.goal;
   $("#goal").title = data.goal;
+  showIslandName();
 }
 $("#sample").hidden = data !== seed;
 
@@ -304,6 +308,7 @@ function updateProgress() {
     const count = pillar.checked.filter(Boolean).length;
     const description = `${pillar.name}，已完成 ${count} / 8 項行動`;
     for (const button of [pillarButtons[i], labels[i]]) {
+      button.classList.toggle("complete", count === 8);
       button.lastElementChild.textContent = count + "/8";
       button.setAttribute("aria-label", description);
       button.title = description;
@@ -325,18 +330,23 @@ function updateProgress() {
   $("#chosen").textContent = "本支柱 " + amount + " / 8";
 }
 
-async function saveCheck(pillar, action, done) {
+async function saveChart(updated) {
   if (!chart) return;
-  const updated = structuredClone(chart);
-  const key = pillar + ":" + action;
-  if (done) updated.doneActions[key] = true;
-  else delete updated.doneActions[key];
   chart = await chartRequest("/api/charts", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chart: updated, expected: chart.revision }),
     signal: AbortSignal.timeout(20_000),
   });
+}
+
+async function saveCheck(pillar, action, done) {
+  if (!chart) return;
+  const updated = structuredClone(chart);
+  const key = pillar + ":" + action;
+  if (done) updated.doneActions[key] = true;
+  else delete updated.doneActions[key];
+  await saveChart(updated);
 }
 
 async function updateCheck(pillar, action, check) {
@@ -384,8 +394,73 @@ function unavailable() {
   $(".scene-footer").hidden = true;
   $(".island-tools").hidden = true;
   $("#islandLabels").hidden = true;
+  $("#downloadPostcard").disabled = true;
   stage = null;
 }
+
+function showIslandName() {
+  const name = islandName || defaultIslandName;
+  for (const element of [$("#sceneName"), $("#immersiveIslandName")]) {
+    element.textContent = name;
+    element.lang = islandName ? "zh-Hant" : "ja";
+  }
+  document.title = name + " · 願いの曼陀羅";
+}
+
+const nameplate = $("#nameplateDialog");
+const nameplateStatus = $("#nameplateStatus");
+const nameInput = $("#islandName");
+$("#islandNameplate").onclick = () => {
+  if (saving) return;
+  nameInput.value = islandName;
+  nameplateStatus.textContent = "";
+  nameplate.showModal();
+};
+$("#closeNameplate").onclick = () => nameplate.close();
+$("#nameplateForm").onsubmit = async (event) => {
+  event.preventDefault();
+  if (saving) return;
+  const name = nameInput.value.trim();
+  saving = true;
+  try {
+    if (chart && name !== islandName) await saveChart({ ...chart, islandName: name });
+    islandName = name;
+    showIslandName();
+    nameplate.close();
+  } catch (error) {
+    nameplateStatus.textContent = error.message;
+  } finally {
+    saving = false;
+  }
+};
+
+$("#downloadPostcard").onclick = async (event) => {
+  if (!stage || saving) return;
+  const button = event.currentTarget;
+  button.disabled = true;
+  nameplateStatus.textContent = "正在製作明信片…";
+  try {
+    const name = nameInput.value.trim() || defaultIslandName;
+    await document.fonts.ready;
+    const blob = await makePostcard(canvas, {
+      name,
+      goal: data.goal,
+      pillars: data.pillars,
+      sky: getComputedStyle(canvas.parentElement).getPropertyValue("--scene-sky").trim(),
+    }, (draw) => stage.capture(draw));
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name.replace(/[<>:"/\\|?*]/g, " ") + "・進度明信片.png";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    nameplateStatus.textContent = "明信片已下載。";
+  } catch {
+    nameplateStatus.textContent = "明信片製作失敗，請再試一次。";
+  } finally {
+    button.disabled = !stage;
+  }
+};
 
 function syncRotation() {
   $("#rotate").textContent = auto ? "暫停旋轉" : "自動旋轉";
@@ -536,7 +611,7 @@ function svgChart() {
     });
   });
   let s =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1180" viewBox="0 0 1080 1180"><rect width="1080" height="1180" fill="#f7f7ef"/><text x="45" y="55" font-family="Arial,sans-serif" font-size="25" fill="#304636">願望之境 · 我的曼陀羅表</text><text x="45" y="88" font-family="Arial,sans-serif" font-size="13" fill="#7d8b74">一個核心目標 / 八個支柱 / 六十四個開始的可能</text>';
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1180" viewBox="0 0 1080 1180"><rect width="1080" height="1180" fill="#f7f7ef"/><text x="45" y="55" font-family="Arial,sans-serif" font-size="25" fill="#304636">願いの曼陀羅 · 我的曼陀羅表</text><text x="45" y="88" font-family="Arial,sans-serif" font-size="13" fill="#7d8b74">一個核心目標 / 八個支柱 / 六十四個開始的可能</text>';
   for (let y = 0; y < 9; y++)
     for (let x = 0; x < 9; x++) {
       let d = cells[y][x],
@@ -553,7 +628,7 @@ function svgChart() {
     }
   return (
     s +
-    '<text x="45" y="1150" font-family="Arial,sans-serif" font-size="12" fill="#7d8b74">WISHLANDS</text></svg>'
+    '<text x="45" y="1150" font-family="Arial,sans-serif" font-size="12" fill="#7d8b74">願いの曼陀羅</text></svg>'
   );
 }
 $("#export").onclick = () => {

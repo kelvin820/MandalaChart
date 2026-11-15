@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta
       name="description"
-      content="探索願望浮島，勾選行動，讓島上的工坊持續為中央火炬送燃料。"
+      content="探索灯火の八咫。每完成一項行動，便為中央火炬添一分微光。"
     />
-    <title>願望浮島 · 願望之境</title>
+    <title>灯火の八咫 · 願いの曼陀羅</title>
     <meta name="theme-color" content="#111119" />
     <link rel="stylesheet" href="/theme.css" />
     <link rel="stylesheet" href="style.css" />
@@ -23,7 +23,7 @@
           height="48"
           alt=""
         />
-        <span>願望之境<small>WISHLANDS</small></span>
+        <span lang="ja">願いの曼陀羅</span>
       </div>
       <div class="world-navigation">
         <button type="button" id="fullscreen" aria-pressed="false" hidden>全螢幕</button>
@@ -37,8 +37,8 @@
       <div class="workspace">
         <section class="viewport" data-time="night" aria-labelledby="sceneName">
           <div class="scene-title">
-            <h2 id="sceneName">願望浮島</h2>
-            <p>勾選行動，讓島上的工坊持續為中央火炬送燃料。</p>
+            <h2 id="sceneName" lang="ja">灯火の八咫</h2>
+            <p>每完成一項行動，便為中央火炬添一分微光。</p>
           </div>
           <canvas id="scene" aria-label="可拖曳旋轉的立體目標模型"></canvas>
           <div id="islandLabels" hidden>
@@ -66,7 +66,7 @@
             </div>
             <button type="button" id="islandOverview">回到全景</button>
             <button type="button" id="toggleLabels" aria-pressed="true">
-              島嶼名牌
+              工坊標籤
             </button>
           </div>
           <div class="viewport-controls">
@@ -93,6 +93,7 @@
             這個瀏覽器目前無法顯示 3D。你仍可選取支柱，查看每項行動。
           </p>
           <div class="goal-label">
+            <b id="immersiveIslandName"></b>
             <span>核心目標</span>
             <strong id="goal"></strong>
             <div class="crystal-progress" aria-live="polite">
@@ -110,6 +111,7 @@
             <button id="rotate" aria-pressed="false">自動旋轉</button>
           </div>
           <div class="legend"><i></i> 金色標記代表已完成的行動</div>
+          <button type="button" id="islandNameplate">島嶼名牌</button>
         </section>
         <aside id="goalList" aria-label="目標清單">
           <div class="aside-top">
@@ -126,6 +128,21 @@
         </aside>
       </div>
     </main>
+    <dialog id="nameplateDialog" aria-labelledby="nameplateTitle">
+      <form id="nameplateForm">
+        <div class="dialog-head">
+          <h2 id="nameplateTitle">島嶼名牌</h2>
+          <button type="button" id="closeNameplate" aria-label="關閉">×</button>
+        </div>
+        <label for="islandName">島嶼名稱</label>
+        <input id="islandName" maxlength="36" placeholder="灯火の八咫" />
+        <p id="nameplateStatus" role="status"></p>
+        <div class="dialog-actions">
+          <button type="submit">儲存島名</button>
+          <button type="button" id="downloadPostcard">下載進度明信片 ↓</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="exportDialog">
       <div class="dialog-head">
         <h2>你的曼陀羅表</h2>

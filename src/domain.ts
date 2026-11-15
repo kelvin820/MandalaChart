@@ -32,6 +32,7 @@ const indexKey = z.string().regex(/^[0-7]$/);
 export const chartSchema = z.object({
   id: z.string().uuid(),
   goal: z.string().trim().min(1).max(200),
+  islandName: z.string().trim().max(36).optional(),
   ...contextSchema.shape,
   subGoals: z.array(pillarSchema).length(8),
   pillarContexts: z.record(indexKey, contextSchema).default({}),

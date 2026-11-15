@@ -1009,6 +1009,31 @@ function workyard(parent, depth, index) {
   batchScenery(parent, site);
   return (time) => animations.forEach((animate, j) => animate(time + j * 0.83));
 }
+function workshopLanterns(parent, depth, mist) {
+  const paper = new T.MeshStandardMaterial({
+    color: 0x8c705e,
+    emissive: 0xffa640,
+    emissiveIntensity: 0,
+    roughness: 0.8,
+  });
+  const glows = [];
+  for (const side of [-1, 1]) {
+    const x = depth * 0.31;
+    const z = side * 0.97;
+    const lanternZ = z - side * 0.2;
+    mesh(parent, box, 0x61493b, vec(x, 0.34, z), [0.043, 0.68, 0.043]);
+    mesh(parent, box, 0x61493b, vec(x, 0.66, z - side * 0.1), [0.046, 0.045, 0.25]);
+    mesh(parent, sphere, paper, vec(x, 0.54, lanternZ), [0.16, 0.2, 0.16]);
+    for (const y of [0.452, 0.628])
+      mesh(parent, cylinder, 0x77583e, vec(x, y, lanternZ), [0.11, 0.022, 0.11]);
+    const glow = mist(0xffb257, 0, 0.76, 0.76);
+    glow.position.set(x, 0.54, lanternZ);
+    parent.add(glow);
+    glows.push(glow);
+  }
+  return { paper, glows };
+}
+
 function hearth(root, mist) {
   const flame = new T.Group();
   flame.position.y = 0.59;
@@ -1062,7 +1087,12 @@ function hearth(root, mist) {
   let delivered = 0;
   let burst = 0;
   let fuelColor = 0xffb758;
+  const colors = { dawn: 0xffd096, day: 0xffa24c, dusk: 0xffb95c, night: 0xff8e40 };
   return {
+    setTime(time) {
+      lamp.color.setHex(colors[time]);
+      halo.material.color.copy(lamp.color);
+    },
     arrive(amount, index) {
       fuelColor = [
         0xffb758, 0xffebbe, 0xff784c, 0xffca60, 0x8bc9ff, 0xff91aa, 0xffcb7e,
@@ -1091,7 +1121,8 @@ function hearth(root, mist) {
       halo.scale.setScalar(3.2 + 3.6 * power);
       halo.position.y = 0.83 + power * 1.05;
       lamp.position.y = 1.05 + power * 0.62;
-      lamp.intensity = (3.4 + 19 * power + 4 * burst) * (0.32 + night * 1.06);
+      lamp.distance = 3.3 + 8.2 * Math.sqrt(power);
+      lamp.intensity = (4 + 94 * power + 9 * burst) * (0.4 + night * 0.6);
       sparks.forEach((spark, i) => {
         const age = (time * (0.55 + (i % 3) * 0.19) + i * 0.37) % 1;
         spark.material = paint(fuelColor, true);
@@ -1109,15 +1140,71 @@ function hearth(root, mist) {
   };
 }
 
-function landscape(root) {
+function shorelineWaves(root) {
+  const positions = [];
+  const colors = [];
+  const indices = [];
+  const steps = 20;
+  for (let i = 0; i < 23; i++) {
+    const start = i * 2.39996;
+    const radius = 6.65 + (i % 5) * 0.72;
+    const arc = 0.21 + (i % 4) * 0.08;
+    const first = positions.length / 3;
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps;
+      const taper = Math.sin(Math.PI * t);
+      const angle = start + (t - 0.5) * arc;
+      const bend = radius + 0.19 * Math.sin(t * Math.PI * 2 + start);
+      for (const edge of [-1, 0, 1]) {
+        const point = polar(bend + edge * (0.04 + taper * 0.12), angle, -1.222);
+        positions.push(point.x, point.y, point.z);
+        colors.push(1, 1, 1, edge ? 0 : taper * (0.45 + (i % 4) * 0.15));
+      }
+      if (!step) continue;
+      const row = first + (step - 1) * 3;
+      for (let edge = 0; edge < 2; edge++) {
+        const a = row + edge;
+        indices.push(a, a + 3, a + 1, a + 1, a + 3, a + 4);
+      }
+    }
+  }
+  const geometry = new T.BufferGeometry();
+  geometry.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 4));
+  geometry.setIndex(indices);
+  const material = new T.MeshBasicMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: T.DoubleSide,
+    vertexColors: true,
+    toneMapped: false,
+  });
+  const waves = new T.Mesh(geometry, material);
+  root.add(waves);
+  return waves;
+}
+
+function landscape(root, mist) {
+  const waterGeometry = new T.PlaneGeometry(95, 95, 96, 96);
+  const waterPositions = waterGeometry.getAttribute("position");
+  const waterColors = new T.Float32BufferAttribute(
+    new Float32Array(waterPositions.count * 3),
+    3,
+  );
+  waterGeometry.setAttribute("color", waterColors);
   const water = new T.Mesh(
-    new T.PlaneGeometry(95, 95),
-    new T.MeshBasicMaterial({ color: 0x375b76 }),
+    waterGeometry,
+    new T.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
   );
   water.rotation.x = -Math.PI / 2;
   water.position.y = -1.25;
   root.add(water);
-  const ripples = new T.InstancedMesh(box, paint(0xffffff, true), 130);
+  const rippleMaterial = new T.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0.32,
+    depthWrite: false,
+  });
+  const ripples = new T.InstancedMesh(box, rippleMaterial, 170);
   const transform = new T.Object3D();
   for (let i = 0; i < ripples.count; i++) {
     transform.position.copy(
@@ -1129,6 +1216,21 @@ function landscape(root) {
     ripples.setMatrixAt(i, transform.matrix);
   }
   root.add(ripples);
+  const waves = shorelineWaves(root);
+  const seaMist = Array.from({ length: 10 }, (_, i) => {
+    const angle = i * tau / 10 + 0.19;
+    const anchor = polar(9.2 + (i % 3) * 1.1, angle, -0.92);
+    const bank = new T.Group();
+    bank.position.copy(anchor);
+    root.add(bank);
+    const wisps = [-1, 1].map((side) => {
+      const wisp = mist(0xb5d4ed, 0, 2.8 + (i % 4) * 0.4, 0.51 + (i % 3) * 0.13);
+      wisp.position.copy(polar(side * 0.65, angle + Math.PI / 2, side * 0.09));
+      bank.add(wisp);
+      return wisp;
+    });
+    return { bank, anchor, wisps };
+  });
   const distant = new T.Group();
   root.add(distant);
   for (let i = 0; i < 18; i++) {
@@ -1181,23 +1283,49 @@ function landscape(root) {
     }
     clouds.push({ cloud, anchor });
   }
-  const waterColors = {
-    dawn: 0x527f88,
-    day: 0x659daa,
-    dusk: 0x556989,
-    night: 0x294662,
+  const palette = {
+    dawn: [0x74a6ab, 0x587396, 0xe0bac4, 0xc9e8f2, 0.60, 0.23],
+    day: [0x63bbc2, 0x4084a1, 0xd1edda, 0xddf7ee, 0.57, 0.16],
+    dusk: [0x836a8d, 0x434866, 0xf2aa91, 0xe5bdcb, 0.69, 0.22],
+    night: [0x284760, 0x131c34, 0x8abacb, 0x9dcbea, 0.75, 0.24],
   };
+  let waveOpacity = 0;
   return {
     setTime(time) {
-      water.material.color.setHex(waterColors[time]);
-      const ripple = new T.Color(waterColors[time]).lerp(
-        new T.Color(0xc1e2d9),
-        0.16,
-      );
-      for (let i = 0; i < ripples.count; i++) ripples.setColorAt(i, ripple);
-      ripples.instanceColor.needsUpdate = true;
+      const [nearHex, distantHex, shimmerHex, mistHex, opacity, mistOpacity] = palette[time];
+      const near = new T.Color(nearHex);
+      const distant = new T.Color(distantHex);
+      const shimmer = new T.Color(shimmerHex);
+      const color = new T.Color();
+      for (let i = 0; i < waterPositions.count; i++) {
+        const x = waterPositions.getX(i);
+        const y = waterPositions.getY(i);
+        const radius = Math.hypot(x, y);
+        const current = Math.sin(x * 0.31 + y * 0.24 + Math.sin(y * 0.38));
+        const coast = Math.max(0, 1 - Math.abs(radius - 6.6) / 2.7);
+        color.copy(near).lerp(distant, T.MathUtils.smoothstep(radius, 4, 27));
+        color.lerp(shimmer, 0.055 * current ** 2 + 0.19 * coast ** 2);
+        waterColors.setXYZ(i, color.r, color.g, color.b);
+      }
+      waterColors.needsUpdate = true;
+      rippleMaterial.color.copy(shimmer);
+      waveOpacity = opacity;
+      waves.material.opacity = waveOpacity;
+      waves.material.color.copy(shimmer);
+      seaMist.forEach(({ wisps }) => {
+        wisps.forEach((wisp, i) => {
+          wisp.material.color.setHex(mistHex);
+          wisp.material.opacity = mistOpacity * (i ? 0.72 : 1);
+        });
+      });
     },
     drift(time) {
+      waves.rotation.y = Math.sin(time * 0.13) * 0.07;
+      waves.material.opacity = waveOpacity * (0.91 + 0.09 * Math.sin(time * 0.65));
+      seaMist.forEach(({ bank, anchor }, i) => {
+        bank.position.x = anchor.x + Math.sin(time * 0.15 + i) * 0.58;
+        bank.position.z = anchor.z + Math.cos(time * 0.10 + i) * 0.43;
+      });
       clouds.forEach(({ cloud, anchor }, i) => {
         cloud.position.x = anchor.x + Math.sin(time * 0.18 + i) * 0.95;
         cloud.position.z = anchor.z + Math.cos(time * 0.12 + i) * 0.5;
@@ -1208,7 +1336,7 @@ function landscape(root) {
 
 export function makeTimberIslands(pillars, mist, onDelivery) {
   const root = new T.Group();
-  const scenery = landscape(root);
+  const scenery = landscape(root, mist);
   const hub = new T.Group();
   root.add(hub);
   const base = new T.CylinderGeometry(
@@ -1294,6 +1422,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
       }
     }
     const machinery = workyard(shore, depth, i);
+    const celebration = workshopLanterns(shore, depth, mist);
     const heading = outward.clone().negate();
     const ramp = polar(innerEdge + 0.06, a);
     const entrance = polar(coreEdge - 0.06, a);
@@ -1364,7 +1493,7 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
         delivered: false,
       };
     });
-    routes.push({ workers, machinery });
+    routes.push({ workers, machinery, celebration, complete: false });
     dots.push(
       pillar.checked.map((checked, j) =>
         mesh(
@@ -1385,6 +1514,10 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
 
   function highlight(index) {
     selected = index;
+    routes.forEach((route, i) => {
+      route.complete = pillars[i].checked.every(Boolean);
+      route.celebration.paper.color.setHex(route.complete ? 0xffce83 : 0x8c705e);
+    });
     dots.forEach((group, i) =>
       group.forEach((marker, j) => {
         const checked = pillars[i].checked[j];
@@ -1478,7 +1611,10 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
     dispose() {
       sleepMaterial.map.dispose();
     },
-    setTime: scenery.setTime,
+    setTime(time) {
+      scenery.setTime(time);
+      fire.setTime(time);
+    },
     highlight,
     refresh(change) {
       highlight(selected);
@@ -1498,6 +1634,11 @@ export function makeTimberIslands(pillars, mist, onDelivery) {
         route.workers.forEach((worker) =>
           advance(worker, index, delta, motion),
         );
+        route.celebration.paper.emissiveIntensity = route.complete ? 0.8 + light * 2.8 : 0;
+        route.celebration.glows.forEach((glow) => {
+          glow.material.opacity = route.complete ? 0.1 + light * 0.32 : 0;
+          glow.visible = route.complete;
+        });
       });
       fire.tick(time, delta, light, motion);
       lanterns.forEach((lamp) => {

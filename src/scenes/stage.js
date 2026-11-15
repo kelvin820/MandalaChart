@@ -7,10 +7,10 @@ const islandView = { eye: [11.5, 12.5, 15.2], target: -0.38 };
 const heroView = { eye: [7.9, 7, 11.6], target: 1.08 };
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const times = {
-  dawn: [0xffd4b0, 0x7e93c2, 2.25, 1.65, 0.48],
-  day: [0xffeed1, 0x99c9e2, 3.3, 2.2, 0.08],
-  dusk: [0xffaa6c, 0x8c9bd5, 2.55, 1.36, 0.65],
-  night: [0xa4b6ff, 0xa5b8eb, 1.14, 1.22, 1],
+  dawn: [0xffdcbb, 0xd9dff2, 2.75, 1.16, 0x98a9c2, 0.42, [-7, 6, 5]],
+  day: [0xfff0cf, 0xbae4ed, 3.3, 1.48, 0x92bfc9, 0.1, [-5, 12, 5]],
+  dusk: [0xffae72, 0xb4a8d5, 3.55, 0.93, 0x8f7088, 0.7, [8, 4, 3]],
+  night: [0xb1caf9, 0x91a8cc, 2.45, 0.69, 0x181d36, 1, [-7, 8, 4]],
 };
 
 function haloTexture() {
@@ -42,17 +42,17 @@ function atmosphere(scene) {
     "position",
     new THREE.Float32BufferAttribute(points, 3),
   );
-  scene.add(
-    new THREE.Points(
-      geometry,
-      new THREE.PointsMaterial({
-        color: 0xffdfac,
-        size: 0.031,
-        transparent: true,
-        opacity: 0.58,
-      }),
-    ),
+  const dust = new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({
+      color: 0xffdfac,
+      size: 0.031,
+      transparent: true,
+      opacity: 0.58,
+    }),
   );
+  scene.add(dust);
+  return dust;
 }
 
 function disposeObjects(group) {
@@ -113,7 +113,7 @@ export function mountStage(
   const rim = new THREE.DirectionalLight(0x789cff, 2.8);
   rim.position.set(3, 5, -7);
   scene.add(rim);
-  atmosphere(scene);
+  const dust = atmosphere(scene);
 
   const halo = haloTexture();
   function mist(color, opacity, width, height) {
@@ -163,19 +163,18 @@ export function mountStage(
 
   function applyLighting() {
     if (!hero) {
-      const [sun, sky, direct, diffuse, lamps] = times[timeOfDay];
+      const [sun, sky, direct, diffuse, fog, lamps, direction] = times[timeOfDay];
       key.color.setHex(sun);
       ambient.color.setHex(sky);
       key.intensity = direct;
       ambient.intensity = diffuse;
-      rim.intensity = 0.95;
+      rim.intensity = 0.52;
+      scene.fog.color.setHex(fog);
+      scene.fog.density = 0.025;
+      dust.material.opacity = timeOfDay === "night" ? 0.52 : 0.15;
       night = lamps;
       model.setTime?.(timeOfDay);
-      key.position.set(
-        timeOfDay === "dusk" ? 8 : -6,
-        timeOfDay === "day" ? 10 : 5,
-        4,
-      );
+      key.position.set(...direction);
     }
   }
 
@@ -349,6 +348,10 @@ export function mountStage(
   resize();
   return {
     dispose,
+    capture(draw) {
+      renderer.render(scene, camera);
+      draw();
+    },
     refreshProgress(change) {
       model.refresh?.(change);
       requestRender();
