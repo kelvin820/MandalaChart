@@ -1325,8 +1325,14 @@ async function act(action: string, button: HTMLElement, keyboard = false) {
     if (dialog.open) dialog.close();
     if (clerk.user) {
       show(modal("帳號", "", '<button type="button" data-action="accountProfile">管理帳號</button><button type="button" data-action="signOut">登出</button>'));
-    } else if (action === "signUp") clerk.openSignUp();
-    else clerk.openSignIn();
+    } else {
+      // The dashboard can save the guest chart after authentication leaves its hash route.
+      const returnHome = current ? "/" : undefined;
+      if (action === "signUp")
+        clerk.openSignUp({ forceRedirectUrl: returnHome, signInForceRedirectUrl: returnHome });
+      else
+        clerk.openSignIn({ forceRedirectUrl: returnHome, signUpForceRedirectUrl: returnHome });
+    }
     return;
   }
   if (action === "accountProfile") {
