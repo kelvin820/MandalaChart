@@ -2,7 +2,7 @@ import { PDFDocument, PageSizes } from "pdf-lib";
 import { svgChart } from "../src/export.ts";
 import type { Chart } from "../src/domain.ts";
 export interface FileStore {
-  get(key: string): Promise<Uint8Array | null>;
+  get(key: string): Promise<Uint8Array | ReadableStream<Uint8Array> | null>;
   put(key: string, bytes: Uint8Array): Promise<void>;
 }
 export function attachment(body: BodyInit, type: string, name: string) {
@@ -127,7 +127,7 @@ export async function chartFile(
     const bytes = await files.get(key);
     return bytes
       ? attachment(
-          new Uint8Array(bytes).buffer,
+          bytes instanceof Uint8Array ? new Uint8Array(bytes).buffer : bytes,
           "application/pdf",
           "我的曼陀羅表.pdf",
         )

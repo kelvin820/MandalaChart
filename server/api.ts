@@ -28,6 +28,16 @@ export interface Store {
   reserve(owner: string, j: Job): Promise<boolean>;
   finish(owner: string, j: Job): Promise<void>;
 }
+export class ApiProblem extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(message: string, status: number, code: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -193,6 +203,7 @@ export async function api(
     }
     return json({ error: "找不到此操作。" }, 404);
   } catch (e) {
+    if (e instanceof ApiProblem) return json({ error: e.message, code: e.code }, e.status);
     if (e instanceof z.ZodError)
       return json(
         { error: "資料格式不符，請檢查必填內容、長度與八項結構。" },

@@ -2,9 +2,12 @@ import { mountStage } from "./stage.js";
 import { workshops, woods } from "./timber-islands.js";
 import { chartSchema } from "../domain.ts";
 import { makePostcard } from "./postcard.js";
+import { accountHeaders, initWorldAccount, readTrial, storeTrial } from "../cloud-client.ts";
 
 const $ = (selector) => document.querySelector(selector);
-const chartId = new URLSearchParams(location.search).get("chart");
+const route = new URLSearchParams(location.search);
+const chartId = route.get("chart");
+const trial = route.get("trial") === "1";
 const defaultIslandName = "灯火の八咫";
 let chart = null;
 const colors = [
@@ -117,7 +120,7 @@ const seed = {
   })),
 };
 async function chartRequest(url, options) {
-  const response = await fetch(url, options);
+  const response = await fetch(url, { ...options, headers: { ...await accountHeaders(), ...options?.headers } });
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.chart)
     throw new Error(result?.error || "目前無法讀取或儲存曼陀羅表。");
@@ -137,9 +140,11 @@ async function readWorld() {
     if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(chartId))
       throw new Error("找不到指定的曼陀羅表。");
     back.href = "/#" + chartId;
-    const saved = await chartRequest("/api/charts/" + chartId, {
+    if (!trial) await initWorldAccount();
+    const saved = trial ? readTrial() : await chartRequest("/api/charts/" + chartId, {
       signal: AbortSignal.timeout(15_000),
     });
+    if (!saved || saved.id !== chartId) throw new Error("找不到這份試用目標。試用表只保留在原本的分頁。");
     if (
       saved.stale.length ||
       saved.subGoals.some((_, i) => !saved.expansions[i])
@@ -332,6 +337,14 @@ function updateProgress() {
 
 async function saveChart(updated) {
   if (!chart) return;
+  if (trial) {
+    const active = readTrial();
+    if (active?.id !== chart.id || active.revision !== chart.revision)
+      throw new Error("這份試用目標已更新，請返回表格。");
+    chart = chartSchema.parse({ ...updated, revision: chart.revision + 1, updatedAt: new Date().toISOString() });
+    storeTrial(chart);
+    return;
+  }
   chart = await chartRequest("/api/charts", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

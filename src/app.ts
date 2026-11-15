@@ -17,6 +17,7 @@ import {
   type Atom,
 } from "./domain.ts";
 import { demoChart } from "./demo.ts";
+import { accountClient, accountHeaders, readTrial, storeTrial } from "./cloud-client.ts";
 const $ = <T extends HTMLElement = HTMLElement>(s: string) =>
   document.querySelector<T>(s)!;
 const app = $("#app"),
@@ -47,6 +48,42 @@ let charts: Chart[] = [],
   draft = { goal: "", deadline: "", currentState: "", constraints: "" },
   busy = false;
 let noticeTimer: number;
+type Allowance = { total: number; used: number; remaining: number };
+type AppConfig = {
+  mode?: "vercel";
+  modelReady: boolean;
+  provider: string | null;
+  signedIn?: boolean;
+  publishableKey?: string;
+  allowance?: Allowance;
+  checkoutReady?: boolean;
+  sandboxPayments?: boolean;
+};
+let cloud: AppConfig | null = null;
+let account: Awaited<ReturnType<typeof accountClient>> | null = null;
+let accountUserId: string | null = null;
+let loadRevision = 0;
+let checkingPurchase = false;
+const guest = () => !!cloud && !cloud.signedIn;
+
+function readCheckoutDraft() {
+  const value = sessionStorage.getItem("mandala-checkout-draft");
+  if (!value) return;
+  sessionStorage.removeItem("mandala-checkout-draft");
+  try {
+    const stored = JSON.parse(value);
+    if (typeof stored.goal === "string")
+      draft = { goal: stored.goal.slice(0, 200), ...contextSchema.parse(stored) };
+  } catch {
+    // The form is still usable if the temporary draft cannot be restored.
+  }
+}
+
+class AppProblem extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message);
+  }
+}
 function toast(s: string) {
   $("#toast").textContent = s;
   $("#toast").classList.add("show");
@@ -57,9 +94,14 @@ function toast(s: string) {
   );
 }
 async function api<T = any>(path: string, init?: RequestInit): Promise<T> {
+  if (guest() && path.startsWith("/api/charts"))
+    return trialApi(path, init) as T;
+  const user = accountUserId;
+  const headers = await accountHeaders();
+  if (user !== accountUserId) throw Error("帳號已切換，請重試。");
   const response = await fetch(path, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { "Content-Type": "application/json", ...headers, ...init?.headers },
   });
   let body: any;
   try {
@@ -67,20 +109,77 @@ async function api<T = any>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw Error("服務回應中斷，請稍後再試。");
   }
-  if (!response.ok) throw Error(body.error || "操作失敗，請稍後再試。");
+  if (user !== accountUserId) throw Error("帳號已切換，請重試。");
+  if (!response.ok) throw new AppProblem(body.error || "操作失敗，請稍後再試。", body.code);
   return body;
 }
+
+function trialApi(path: string, init?: RequestInit) {
+  const chart = readTrial();
+  if (path === "/api/charts" && (!init?.method || init.method === "GET"))
+    return { charts: chart ? [chart] : [] };
+  if (path === "/api/charts" && init?.method === "PUT") {
+    const { chart: input, expected } = JSON.parse(String(init.body));
+    const next = chartSchema.parse(input);
+    if (chart && chart.id !== next.id) throw new AppProblem("請註冊後建立更多目標。", "TRIAL_LIMIT");
+    if (expected !== (chart?.revision ?? null)) throw Error("這份試用表已更新，請重新開啟。");
+    const saved = { ...next, revision: chart ? chart.revision + 1 : 0, updatedAt: new Date().toISOString() };
+    storeTrial(saved);
+    return { chart: saved };
+  }
+  if (chart && path.split("?")[0] === "/api/charts/" + chart.id) {
+    if (init?.method === "DELETE") storeTrial(null);
+    return { chart };
+  }
+  throw Error("找不到這張試用表。");
+}
+
+async function bindAccount(key: string) {
+  if (account) return account;
+  const clerk = await accountClient(key);
+  if (account) return account;
+  account = clerk;
+  accountUserId = clerk.user?.id ?? null;
+  clerk.addListener(({ user }) => {
+    const id = user?.id ?? null;
+    if (id === accountUserId) return;
+    accountUserId = id;
+    sessionStorage.removeItem("mandala-pending");
+    pending = null;
+    candidate = null;
+    undo = null;
+    selected = null;
+    actionIndex = null;
+    current = null;
+    charts = [];
+    if (dialog.open) dialog.close();
+    void load();
+  }, { skipInitialEmit: true });
+  return clerk;
+}
+
 async function load() {
+  const revision = ++loadRevision;
   const connection = $("#connection");
   connection.dataset.state = "loading";
   connection.textContent = "正在連線…";
   app.innerHTML =
     '<div class="loading-page"><div class="spinner"></div>正在整理你的目標…</div>';
   try {
-    const [config, list] = await Promise.all([
-      api("/api/config"),
-      api("/api/charts"),
-    ]);
+    let config = await api<AppConfig>("/api/config");
+    if (config.mode === "vercel" && config.publishableKey) {
+      try {
+        await bindAccount(config.publishableKey);
+        config = await api<AppConfig>("/api/config");
+      } catch {
+        // A failed Clerk connection still permits the anonymous trial.
+        config.signedIn = false;
+      }
+      if (revision !== loadRevision) return;
+      cloud = config;
+    }
+    const list = await api<{ charts: Chart[] }>("/api/charts");
+    if (revision !== loadRevision) return;
     ready = config.modelReady;
     charts = list.charts;
     connection.dataset.state = ready ? "ready" : "pending";
@@ -89,6 +188,8 @@ async function load() {
       : "AI 尚待連線";
     loadError = "";
   } catch (e) {
+    if (revision !== loadRevision) return;
+    charts = [];
     loadError = (e as Error).message;
     connection.dataset.state = "error";
     connection.textContent = "連線待確認";
@@ -97,10 +198,87 @@ async function load() {
   current = charts.find((c) => c.id === id) ?? null;
   render();
   restorePending();
+  const purchase = new URL(location.href).searchParams.get("purchase");
+  if (purchase && cloud?.signedIn) void showPurchase(purchase);
 }
 function render() {
+  const button = $("#memberButton");
+  button.hidden = !cloud;
+  button.textContent = cloud?.signedIn ? "帳號" : "註冊／登入";
   if (current) renderChart();
   else renderHome();
+}
+
+function accountNotice() {
+  if (!cloud) return "";
+  if (guest()) {
+    return `<div class="membership-card">
+      <p>訪客可試用一份完整目標，關閉分頁後不會保留。</p>
+      <button type="button" data-action="signUp">免費註冊 · 保存目標</button>
+    </div>`;
+  }
+  const a = cloud.allowance;
+  return `<div class="membership-card">
+    <p>${a ? `已建立 ${a.used} 個目標 · 可用 ${a.remaining} 個名額` : "已登入"}</p>
+    ${readTrial() ? '<button type="button" data-action="claimTrial">保存這份試用目標</button>' : ""}
+    ${a && a.used >= a.total && cloud.checkoutReady ? '<button type="button" data-action="checkout">購買 1 個目標名額 ↗</button>' : ""}
+  </div>`;
+}
+
+function showLimit(code: string) {
+  if (code === "TRIAL_LIMIT") {
+    show(modal("註冊後繼續你的願望", "<p>訪客可試用一個目標。註冊後可建立三個目標，並在其他裝置接著做。</p>",
+      '<button type="button" class="primary" data-action="signUp">免費註冊 ↗</button>'));
+  } else {
+    const allowance = cloud?.allowance;
+    if (allowance && allowance.used < allowance.total && !allowance.remaining) {
+      show(modal("名額正在使用中", "<p>有目標正在生成，請等候完成後再試。</p>"));
+      return;
+    }
+    show(modal("新增一個目標名額", `<p>免費名額已用完。你可以單次購買一個名額，原有目標仍可繼續編輯。</p>${cloud?.sandboxPayments ? '<p class="note">測試付款模式，無實際扣款。</p>' : ""}`, cloud?.checkoutReady
+      ? '<button type="button" class="primary" data-action="checkout">前往付款 ↗</button>'
+      : '<p class="note">付款功能尚未啟用。</p>'));
+  }
+}
+
+async function refreshAllowance() {
+  if (cloud?.signedIn) {
+    const config = await api<AppConfig>("/api/config").catch(() => null);
+    if (config?.allowance) cloud.allowance = config.allowance;
+  }
+}
+
+async function showPurchase(id: string) {
+  if (!cloud?.signedIn || checkingPurchase) return;
+  checkingPurchase = true;
+  const stateBox = `<p id="purchaseState" role="status">正在確認付款結果…</p>`;
+  show(modal("付款進度", stateBox, '<button type="button" data-action="checkPurchase">重新確認</button>'));
+  const statusBox = $("#purchaseState");
+  try {
+    for (let i = 0; i < 8 && statusBox.isConnected && dialog.open; i++) {
+      const status = await api<Allowance & { state: string }>("/api/billing/status?id=" + encodeURIComponent(id));
+      if (status.state === "paid") {
+        cloud.allowance = status;
+        const url = new URL(location.href);
+        url.searchParams.delete("purchase");
+        history.replaceState(null, "", url);
+        dialog.close();
+        render();
+        toast("付款已確認，新增 1 個目標名額。");
+        return;
+      }
+      if (status.state !== "open") {
+        statusBox.textContent = status.state === "refunded" ? "這筆付款已退款。" : "這筆付款已過期。";
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+    }
+    statusBox.textContent = "仍在等候付款確認。可以稍後再查詢，請勿重複付款。";
+  } catch (error) {
+    statusBox.textContent = (error as Error).message;
+  } finally {
+    checkingPurchase = false;
+  }
 }
 function contextFields(prefix: string, c: Context, local = false) {
   return `<div class="context-fields"><label class="field"><span class="label">期限${local ? "（這個支柱）" : ""}</span><input id="${prefix}Deadline" maxlength="100" value="${escape(c.deadline)}" placeholder="${local ? "留空沿用整體期限" : "例如：半年內、2027 年 6 月前"}"></label><label class="field"><span class="label">目前起點</span><textarea id="${prefix}State" maxlength="500" rows="2" placeholder="${local ? "這個能力目前做到哪裡？" : "例如：完全新手、已有基礎但停滯半年"}">${escape(c.currentState)}</textarea></label><label class="field"><span class="label">限制條件</span><textarea id="${prefix}Constraints" maxlength="500" rows="2" placeholder="${local ? "局部條件應符合整體時間與預算" : "例如：每週能投入三小時、預算有限"}">${escape(c.constraints)}</textarea></label></div>`;
@@ -152,6 +330,7 @@ function renderHome() {
             <button class="primary" type="submit" ${disabled}>${ready ? "一鍵生成完整曼陀羅表 ↗" : "開始拆解目標 ↗"}</button>
           </div>
         </form>
+        ${accountNotice()}
       </section>
       <aside class="home-side" aria-labelledby="stepsTitle">
         <h2 id="stepsTitle">目標拆解流程</h2>
@@ -169,8 +348,7 @@ function renderHome() {
         <h2 id="chartsTitle" tabindex="-1">我的曼陀羅表 <span class="step">${charts.length} 張</span></h2>
         <div class="inline-buttons">
           <button class="quiet" data-action="demo" ${disabled}>試用範例</button>
-          <button class="quiet" data-action="import">匯入備份</button>
-          <a class="quiet button-link" href="/api/backup.json" target="_blank" rel="noopener">備份全部 ↓</a>
+          ${guest() ? "" : '<button class="quiet" data-action="import">匯入備份</button><a class="quiet button-link" href="/api/backup.json" target="_blank" rel="noopener">備份全部 ↓</a>'}
         </div>
       </div>
       ${charts.length
@@ -184,6 +362,8 @@ function renderHome() {
       ...readContext("home"),
     };
     if (!draft.goal) return;
+    if (guest() && readTrial()) return showLimit("TRIAL_LIMIT");
+    if (cloud?.signedIn && cloud.allowance?.remaining === 0) return showLimit("GOAL_LIMIT");
     openPrompt("create");
   };
   $("#goalInput").oninput = () =>
@@ -298,6 +478,7 @@ function renderChart() {
           <button data-action="export">匯出曼陀羅表 ↗</button>
           <button data-action="worlds" ${p.expanded < 8 || c.stale.length ? "disabled" : ""}>前往灯火の八咫 ↗</button>
         </div>
+        ${guest() ? accountNotice() : ""}
         ${p.expanded < 8 || c.stale.length ? `<p class="note">${p.expanded < 8 ? "展開八個支柱後，即可前往 3D 浮島。" : "先確認修改過的支柱，再前往浮島。"}</p>` : ""}
       </aside>
     </div>`;
@@ -501,6 +682,7 @@ async function saveChart(c: Chart, expected: number | null = c.revision) {
     charts = charts.filter((x) => x.id !== saved.id);
     charts.unshift(saved);
     if (current?.id === saved.id) current = saved;
+    if (expected === null) await refreshAllowance();
     return saved;
   } finally {
     busy = false;
@@ -545,6 +727,10 @@ function outputFormat(op: Operation) {
       : '{"subGoals":[{"title":"支柱名稱","description":"與終極目標的關聯","actionHint":"一個具體行動範例"}]}（subGoals 必須恰好八項）';
 }
 function openPrompt(op: Operation) {
+  if (guest() && op !== "create") {
+    showLimit("TRIAL_LIMIT");
+    return;
+  }
   if (pending) {
     showPending();
     return;
@@ -565,6 +751,7 @@ function openPrompt(op: Operation) {
   pending = {
     input: {
       requestId: crypto.randomUUID(),
+      ...(cloud && current && op !== "create" ? { chartId: current.id } : {}),
       operation: op,
       ...(full ? { full: true as const } : {}),
       ...{
@@ -637,6 +824,14 @@ async function startGeneration() {
   } catch (e) {
     if (pending?.input.requestId !== id) return;
     const msg = (e as Error).message;
+    if (e instanceof AppProblem && (e.code === "TRIAL_LIMIT" || e.code === "GOAL_LIMIT")) {
+      clearPendingTimer();
+      sessionStorage.removeItem("mandala-pending");
+      pending = null;
+      await refreshAllowance();
+      showLimit(e.code);
+      return;
+    }
     if (msg.includes("尚未完成模型") || msg.includes("生成頻率")) {
       generationError(msg);
     } else {
@@ -675,8 +870,10 @@ async function finishGeneration(payload: unknown) {
             updatedAt: now,
           }), null);
         } catch (error) {
+          if (pending !== request) return;
           // A lost response can leave a successfully saved chart on the server.
           const result = await api("/api/charts/" + id).catch(() => null);
+          if (pending !== request) return;
           if (!result) {
             generationError("生成已完成，但目前無法儲存。請按「重新檢查狀態」再試，無須重新生成。", true);
             return;
@@ -693,7 +890,7 @@ async function finishGeneration(payload: unknown) {
       undo = null;
       dialog.close();
       openChart(saved.id);
-      toast("已儲存八個支柱與六十四項行動。");
+      toast(guest() ? "已生成完整試用目標。註冊後可以保存。" : "已儲存八個支柱與六十四項行動。");
     } else {
       if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
         await new Promise((resolve) => setTimeout(resolve, 450));
@@ -1039,7 +1236,7 @@ async function preparePdf(button: HTMLElement) {
     if (png.size > 3_000_000) throw Error("PDF 圖片過大，請改用 SVG 下載。");
     const response = await fetch(exportUrl("pdf", snapshot), {
       method: "POST",
-      headers: { "Content-Type": "image/png" },
+      headers: { "Content-Type": "image/png", ...await accountHeaders() },
       body: png,
       signal: AbortSignal.timeout(60000),
     });
@@ -1057,6 +1254,11 @@ async function preparePdf(button: HTMLElement) {
   }
 }
 function openExport() {
+  if (guest()) {
+    show(modal("匯出試用目標", `<div class="export-preview">${svgChart(current!)}</div>`,
+      '<button data-action="trialJson">下載 JSON ↓</button><button data-action="trialSvg">下載 SVG ↓</button><button data-action="trialPrint">列印／PDF</button>'));
+    return;
+  }
   show(
     modal(
       "讓你的計畫，看得見",
@@ -1075,7 +1277,7 @@ function openWorlds() {
     toast("先完成八個支柱的拆解與檢查，再看立體成果。");
     return;
   }
-  location.assign("/worlds/?chart=" + encodeURIComponent(c.id));
+  location.assign("/worlds/?chart=" + encodeURIComponent(c.id) + (guest() ? "&trial=1" : ""));
 }
 function migrateImported(raw: any): Chart {
   const m = structuredClone(raw);
@@ -1117,6 +1319,55 @@ function validateImportedCharts(raw: any) {
 }
 let deleting = false;
 async function act(action: string, button: HTMLElement, keyboard = false) {
+  if (action === "account" || action === "signUp") {
+    if (!cloud?.publishableKey) return;
+    const clerk = await bindAccount(cloud.publishableKey);
+    if (dialog.open) dialog.close();
+    if (clerk.user) clerk.openUserProfile();
+    else if (action === "signUp") clerk.openSignUp();
+    else clerk.openSignIn();
+    return;
+  }
+  if (action === "claimTrial") {
+    const chart = readTrial();
+    if (!cloud?.signedIn || !chart) return;
+    const saved = charts.find((item) => item.id === chart.id) ?? await saveChart(chart, null);
+    storeTrial(null);
+    openChart(saved.id);
+    toast("已保存試用目標，可從其他裝置繼續。");
+    return;
+  }
+  if (action === "checkout") {
+    button.setAttribute("disabled", "");
+    try {
+      const result = await api<{ url: string }>("/api/billing/checkout", { method: "POST" });
+      sessionStorage.setItem("mandala-checkout-draft", JSON.stringify(draft));
+      location.assign(result.url);
+    } finally {
+      button.removeAttribute("disabled");
+    }
+    return;
+  }
+  if (action === "checkPurchase") {
+    const id = new URL(location.href).searchParams.get("purchase");
+    if (id) await showPurchase(id);
+    return;
+  }
+  if (action === "trialJson" || action === "trialSvg") {
+    const svg = action === "trialSvg";
+    const text = svg ? svgChart(current!) : JSON.stringify({ version: 2, charts: [current] }, null, 2);
+    const url = URL.createObjectURL(new Blob([text], { type: svg ? "image/svg+xml" : "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = svg ? "曼陀羅表.svg" : "曼陀羅表.json";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    return;
+  }
+  if (action === "trialPrint") {
+    window.print();
+    return;
+  }
   if (action === "focusGoal") {
     $("#goalInput").focus();
     return;
@@ -1151,6 +1402,10 @@ async function act(action: string, button: HTMLElement, keyboard = false) {
     return;
   }
   if (action === "demo") {
+    if (cloud) {
+      location.assign("/worlds/");
+      return;
+    }
     button.setAttribute("disabled", "");
     try {
       const c = await saveChart(demoChart(), null);
@@ -1464,6 +1719,10 @@ document.addEventListener("click", (e) => {
   );
   if (!button || button.hasAttribute("disabled")) return;
   void act(button.dataset.action!, button, e.detail === 0).catch((e) => {
+    if (e instanceof AppProblem && (e.code === "GOAL_LIMIT" || e.code === "TRIAL_LIMIT")) {
+      showLimit(e.code);
+      return;
+    }
     const msg = (e as Error).message || "操作未完成，請稍後重試。";
     toast(msg);
     if (dialog.open) {
@@ -1496,4 +1755,5 @@ window.addEventListener("hashchange", () => {
   if (id) openChart(id);
   else goHome();
 });
+readCheckoutDraft();
 void load();

@@ -2,8 +2,13 @@
   "name": "mandala-goal-studio",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:vercel": "node scripts/build.mjs --vercel",
+    "db:vercel": "node --env-file-if-exists=.env scripts/migrate-vercel.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "start": "node --env-file-if-exists=.env dist/local.mjs",
@@ -11,9 +16,15 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "latest",
+    "@clerk/backend": "^3.29.0",
+    "@clerk/clerk-js": "^6.43.1",
+    "@clerk/localizations": "^4.24.8",
+    "@libsql/client": "^0.18.0",
+    "@vercel/blob": "^2.9.0",
     "ai": "latest",
     "drizzle-orm": "^0.45.4",
     "pdf-lib": "^1.17.1",
+    "standardwebhooks": "^1.1.1",
     "three": "0.187.0",
     "zod": "latest"
   },

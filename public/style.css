@@ -195,6 +195,30 @@ p {
   transform: translateX(-50%);
   background: #e0bb8c;
 }
+.membership-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid #584837;
+  border-radius: 10px;
+  background: #2a2529;
+}
+.membership-card p {
+  flex: 1 1 150px;
+  margin: 0;
+  color: #efdbbc;
+  font-size: 12px;
+}
+.membership-card button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-color: #ad8755;
+  color: #f1d7a9;
+  font-size: 12px;
+}
 .account-avatar::before {
   top: 19%;
   width: 27%;
@@ -1825,6 +1849,9 @@ dialog::backdrop {
   }
 }
 @media (max-width: 490px) {
+  .header-right:has(#memberButton:not([hidden])) .account-avatar {
+    display: none;
+  }
   #connection {
     display: none;
   }

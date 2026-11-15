@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": "dist/client",
+  "fluid": true,
+  "functions": {
+    "api/mandala-server.ts": { "maxDuration": 240 }
+  },
+  "crons": [{ "path": "/api/maintenance", "schedule": "0 20 * * *" }],
+  "rewrites": [
+    { "source": "/worlds/", "destination": "/worlds/index.html" },
+    { "source": "/api/:path*", "destination": "/api/mandala-server?__mandala_path=:path*" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "same-origin" }
+      ]
+    }
+  ]
+}

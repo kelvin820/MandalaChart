@@ -53,6 +53,7 @@ export type Operation = "create" | "all" | "pillar" | "expand";
 export const generationSchema = z
   .object({
     requestId: z.string().uuid(),
+    chartId: z.string().uuid().optional(),
     operation: z.enum(["create", "all", "pillar", "expand"]),
     full: z.literal(true).optional(),
     goal: z.string().trim().min(1).max(200),
